@@ -16,6 +16,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WeatherApp"
         tools:targetApi="31">
+        <activity
+            android:name=".WidgetSettingsActivity"
+            android:exported="false"
+            android:label="@string/title_activity_widget_settings"
+            android:theme="@style/Theme.WeatherApp" />
+
         <receiver
             android:name=".MoonPhaseWidget"
             android:exported="false">
@@ -32,6 +38,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
 
             <meta-data
@@ -54,7 +61,7 @@
             android:name=".PermissionRequestActivity"
             android:exported="true"
             android:label="Permission"
-            android:theme="@style/Theme.WeatherApp"></activity>
+            android:theme="@style/Theme.WeatherApp" />
     </application>
 
 </manifest>
