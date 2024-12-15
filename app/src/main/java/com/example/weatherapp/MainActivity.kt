@@ -1,7 +1,11 @@
 package com.example.weatherapp
 
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -19,10 +23,19 @@ class MainActivity : ComponentActivity() {
 
         window.statusBarColor = android.graphics.Color.BLACK
 
-        // Request location permission
-//        val intent = Intent(this, PermissionRequestActivity::class.java)
-//        startActivity(intent)
+        requestIgnoreBatteryOptimizations(this)
+    }
 
+    fun requestIgnoreBatteryOptimizations(context: Context) {
+        val intent = Intent()
+        val powerManager = getSystemService(POWER_SERVICE) as? PowerManager
+
+        if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(context.packageName)) {
+            Log.d("MainActivity", "Requesting ignore battery optimizations")
+            intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            intent.data = Uri.parse("package:" + context.packageName)
+            context.startActivity(intent)
+        }
     }
 }
 
