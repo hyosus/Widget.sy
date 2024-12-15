@@ -57,11 +57,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".PermissionRequestActivity"
-            android:exported="true"
-            android:label="Permission"
-            android:theme="@style/Theme.WeatherApp" />
     </application>
 
 </manifest>

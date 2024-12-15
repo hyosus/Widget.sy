@@ -1,6 +1,7 @@
 package com.example.weatherapp
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Address
@@ -8,6 +9,7 @@ import android.location.Geocoder
 import android.os.Build
 import android.os.Looper
 import android.util.Log
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
 import java.io.IOException
@@ -18,13 +20,13 @@ class LocationHelper(private val context: Context) {
         LocationServices.getFusedLocationProviderClient(context)
 
     fun getLocation(
+        activity: Activity,
         onLocationReceived: (latitude: Double, longitude: Double) -> Unit,
         onError: ((error: String) -> Unit)? = null
     ) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED
         ) {
-
             // Attempt to retrieve the last known location first
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
@@ -40,8 +42,13 @@ class LocationHelper(private val context: Context) {
                 onError?.invoke("Failed to retrieve last known location.")
             }
         } else {
-            Log.e("LocationHelper", "Location permission not granted")
-            onError?.invoke("Location permission not granted. Please grant permissions.")
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                WidgetSettingsActivity.Companion.LOCATION_PERMISSION_REQUEST_CODE
+            )
+//            Log.e("LocationHelper", "Location permission not granted")
+//            onError?.invoke("Location permission not granted. Please grant permissions.")
         }
     }
 
@@ -85,43 +92,47 @@ class LocationHelper(private val context: Context) {
         }
     }
 
-        private fun requestLocationUpdates(
-            onLocationReceived: (latitude: Double, longitude: Double) -> Unit,
-            onError: ((error: String) -> Unit)?
-        ) {
-            val locationRequest = LocationRequest.create().apply {
-                priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-                interval = 10000
-                fastestInterval = 1000
-            }
+    private fun requestLocationUpdates(
+        onLocationReceived: (latitude: Double, longitude: Double) -> Unit,
+        onError: ((error: String) -> Unit)?
+    ) {
+        val locationRequest = LocationRequest.create().apply {
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+            interval = 10000
+            fastestInterval = 1000
+        }
 
-            val locationCallback = object : LocationCallback() {
-                override fun onLocationResult(locationResult: LocationResult) {
-                    locationResult.lastLocation?.let { location ->
-                        onLocationReceived(location.latitude, location.longitude)
-                        fusedLocationClient.removeLocationUpdates(this)
-                    } ?: run {
-                        onError?.invoke("Location is null. Unable to retrieve location.")
-                    }
-                }
-
-                override fun onLocationAvailability(locationAvailability: LocationAvailability) {
-                    if (!locationAvailability.isLocationAvailable) {
-                        onError?.invoke("Location services are unavailable.")
-                    }
+        val locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                locationResult.lastLocation?.let { location ->
+                    onLocationReceived(location.latitude, location.longitude)
+                    fusedLocationClient.removeLocationUpdates(this)
+                } ?: run {
+                    onError?.invoke("Location is null. Unable to retrieve location.")
                 }
             }
 
-            try {
-                fusedLocationClient.requestLocationUpdates(
-                    locationRequest,
-                    locationCallback,
-                    Looper.getMainLooper()
-                )
-            } catch (e: SecurityException) {
-                Log.e("LocationHelper", "Location permission revoked or restricted", e)
-                onError?.invoke("Location permission revoked or restricted.")
+            override fun onLocationAvailability(locationAvailability: LocationAvailability) {
+                if (!locationAvailability.isLocationAvailable) {
+                    onError?.invoke("Location services are unavailable.")
+                }
             }
         }
 
+        try {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        } catch (e: SecurityException) {
+            Log.e("LocationHelper", "Location permission revoked or restricted", e)
+            onError?.invoke("Location permission revoked or restricted.")
+        }
     }
+
+    companion object {
+        const val LOCATION_PERMISSION_REQUEST_CODE = 1001
+    }
+}
+

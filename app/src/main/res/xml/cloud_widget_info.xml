@@ -13,4 +13,4 @@
     android:updatePeriodMillis="10800000"
     android:widgetCategory="home_screen"
     android:configure="com.example.weatherapp.WidgetSettingsActivity"
-    android:widgetFeatures="reconfigurable|configuration_optional"/>
+    android:widgetFeatures="reconfigurable"/>
