@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -35,8 +36,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.weatherapp.ui.theme.WeatherAppTheme
@@ -157,20 +160,36 @@ class WidgetSettingsActivity : ComponentActivity() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(WindowInsets.statusBars.asPaddingValues())
-                .padding(start = 16.dp, end = 16.dp),
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Header()
             LocationInputField(locationTxt)
             SaveButton(locationTxt, onSave)
             SetAutomaticallyButton(locationTxt)
         }
     }
 
+    @Composable
+    fun Header() {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = "Widget Settings",
+                fontWeight = FontWeight.Bold,
+                fontSize = 24.sp
+            )
+        }
+    }
 
     @Composable
     fun LocationInputField(locationTxt: MutableState<String>) {
         Row(
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier.padding(8.dp).padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
@@ -204,7 +223,7 @@ class WidgetSettingsActivity : ComponentActivity() {
     @Composable
     fun SetAutomaticallyButton(locationTxt: MutableState<String>) {
         val context = LocalContext.current
-        Button(
+        FilledTonalButton(
             onClick = {
                 getGPSLocation(context) { location ->
                     locationTxt.value = location ?: "Failed to get location"

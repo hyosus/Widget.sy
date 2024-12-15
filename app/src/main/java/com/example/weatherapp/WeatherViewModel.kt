@@ -23,11 +23,11 @@ class WeatherViewModel : ViewModel() {
     private val _weatherResult = MutableLiveData<NetworkResponse<WeatherModel>>()
     val weatherResult: LiveData<NetworkResponse<WeatherModel>> = _weatherResult
 
-    fun getData(city: String) {
+    fun getData(location: String) {
         _weatherResult.value = NetworkResponse.Loading
         viewModelScope.launch {
             try {
-                val response = weatherApi.getWeather(Constant.weatherApiKey, city)
+                val response = weatherApi.getWeather(Constant.weatherApiKey, location)
                 if (response.isSuccessful) {
                     response.body()?.let {
                         _weatherResult.value = NetworkResponse.Success(it)
@@ -40,55 +40,5 @@ class WeatherViewModel : ViewModel() {
                 _weatherResult.value = NetworkResponse.Error(e)
             }
         }
-    }
-
-    @SuppressLint("MissingPermission")
-    fun getWeatherByLocation(context: Context) {
-        _weatherResult.value = NetworkResponse.Loading
-
-        val locationRequest = LocationRequest.create().apply {
-            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-            interval = 10000 // Optional: update interval
-            fastestInterval = 5000 // Optional: fastest update interval
-        }
-
-        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-
-        val locationCallback = object : LocationCallback() {
-            override fun onLocationResult(locationResult: LocationResult) {
-                locationResult.lastLocation?.let { location ->
-                    viewModelScope.launch {
-                        try {
-                            val response = weatherApi.getWeather(
-                                Constant.weatherApiKey,
-                                "${location.latitude},${location.longitude}"
-                            )
-
-                            if (response.isSuccessful) {
-                                response.body()?.let {
-                                    _weatherResult.postValue(NetworkResponse.Success(it))
-                                }
-                            } else {
-                                _weatherResult.postValue(
-                                    NetworkResponse.Error(Exception("Error fetching location weather"))
-                                )
-                            }
-                        } catch (e: Exception) {
-                            _weatherResult.postValue(NetworkResponse.Error(e))
-                        }
-                    }
-
-                    // Stop location updates after getting the first result
-                    fusedLocationClient.removeLocationUpdates(this)
-                }
-            }
-        }
-
-        // Request location updates
-        fusedLocationClient.requestLocationUpdates(
-            locationRequest,
-            locationCallback,
-            Looper.getMainLooper()
-        )
     }
 }
