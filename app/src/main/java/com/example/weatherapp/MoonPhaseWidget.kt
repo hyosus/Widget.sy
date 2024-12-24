@@ -12,6 +12,7 @@ import com.example.weatherapp.moonApi.MoonViewModel
 import com.example.weatherapp.weatherApi.NetworkResponse
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -82,10 +83,12 @@ class MoonPhaseWidget : AppWidgetProvider() {
                     }
                     is NetworkResponse.Success -> {
                         val moonData = result.data
+
+                        val absIllumination = abs(moonData.moon_illumination_percentage.toDouble())
                         // Moon phase
                         views.setImageViewResource(
                             R.id.moonPhaseImg,
-                            getMoonPhaseImage(context, moonData.moon_illumination_percentage.toDouble(), moonData.moon_phase))
+                            getMoonPhaseImage(context, absIllumination, moonData.moon_phase))
 
                         Log.d("Moon", "FUCK YOU ${moonData.current_time}")
 
@@ -98,7 +101,7 @@ class MoonPhaseWidget : AppWidgetProvider() {
                         // Moon illumination percentage
                         views.setTextViewText(
                             R.id.illuminationTxt,
-                            "${moonData.moon_illumination_percentage}%"
+                            "${absIllumination}%"
                         )
 
                         // Moonrise & Moonset
