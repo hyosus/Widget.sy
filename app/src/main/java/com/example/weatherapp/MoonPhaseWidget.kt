@@ -145,9 +145,16 @@ class MoonPhaseWidget : AppWidgetProvider() {
                     context.packageName
                 )
             }
-            else {
+            else if (moonPhase == "WANING_GIBBOUS") {
                 return context.resources.getIdentifier(
                     "waning$imageIndex",
+                    "drawable",
+                    context.packageName
+                )
+            }
+            else {
+                return context.resources.getIdentifier(
+                    "full_moon",
                     "drawable",
                     context.packageName
                 )

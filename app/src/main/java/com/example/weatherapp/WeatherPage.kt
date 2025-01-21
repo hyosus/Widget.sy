@@ -54,7 +54,7 @@ fun WeatherPage(viewModel: WeatherViewModel) {
                 }
             )
             IconButton(onClick = {
-                viewModel.getData(city.value)
+
             }) {
                 Icon(imageVector = Icons.Default.Search, contentDescription = "Search")
             }
