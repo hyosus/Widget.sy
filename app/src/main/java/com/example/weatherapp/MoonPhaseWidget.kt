@@ -161,7 +161,7 @@ class MoonPhaseWidget : AppWidgetProvider() {
             }
             else {
                 return context.resources.getIdentifier(
-                    "full_moon",
+                    "waning$imageIndex",
                     "drawable",
                     context.packageName
                 )
