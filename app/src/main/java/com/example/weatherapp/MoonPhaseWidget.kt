@@ -90,7 +90,13 @@ class MoonPhaseWidget : AppWidgetProvider() {
                             R.id.moonPhaseImg,
                             getMoonPhaseImage(context, absIllumination, moonData.moon_phase))
 
-                        Log.d("Moon", "FUCK YOU ${moonData.current_time}")
+                        Log.d("Moon", "FUCK YOU ${
+                            getMoonPhaseImage(
+                                context,
+                                absIllumination,
+                                moonData.moon_phase
+                            )
+                        }")
 
                         val formattedMoonPhase = moonData.moon_phase
                             .lowercase()
@@ -123,6 +129,7 @@ class MoonPhaseWidget : AppWidgetProvider() {
 
         fun getMoonPhaseImage(context: Context, illumination: Double, moonPhase: String): Int {
             val imageIndex = (illumination / 10).roundToInt() * 10 // Round to nearest 10
+            Log.d("Moon", "Image Index: $imageIndex")
 
             if (imageIndex == 0) {
                 return context.resources.getIdentifier(
@@ -138,14 +145,14 @@ class MoonPhaseWidget : AppWidgetProvider() {
                     context.packageName
                 )
             }
-            else if (moonPhase == "WAXING_GIBBOUS") {
+            else if (moonPhase.contains("WAXING")) {
                 return context.resources.getIdentifier(
                     "waxing$imageIndex",
                     "drawable",
                     context.packageName
                 )
             }
-            else if (moonPhase == "WANING_GIBBOUS") {
+            else if (moonPhase.contains("WANING")) {
                 return context.resources.getIdentifier(
                     "waning$imageIndex",
                     "drawable",
