@@ -1,20 +1,13 @@
-package com.example.weatherapp
+package com.example.widgetsy
 
-import android.annotation.SuppressLint
-import android.content.Context
-import android.os.Looper
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.weatherapp.weatherApi.Constant
-import com.example.weatherapp.weatherApi.NetworkResponse
-import com.example.weatherapp.weatherApi.RetrofitInstance
-import com.example.weatherapp.weatherApi.WeatherModel
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
+import com.example.widgetsy.weatherApi.Constant
+import com.example.widgetsy.weatherApi.NetworkResponse
+import com.example.widgetsy.weatherApi.RetrofitInstance
+import com.example.widgetsy.weatherApi.WeatherModel
 import kotlinx.coroutines.launch
 
 class WeatherViewModel : ViewModel() {

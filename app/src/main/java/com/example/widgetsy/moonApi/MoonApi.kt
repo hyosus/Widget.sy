@@ -1,4 +1,4 @@
-package com.example.weatherapp.moonApi
+package com.example.widgetsy.moonApi
 
 import retrofit2.Response
 import retrofit2.http.GET

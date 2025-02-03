@@ -1,4 +1,4 @@
-package com.example.weatherapp
+package com.example.widgetsy
 
 import android.Manifest
 import android.app.Activity
@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.weatherapp.ui.theme.WeatherAppTheme
+import com.example.widgetsy.ui.theme.WeatherAppTheme
 
 class WidgetSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

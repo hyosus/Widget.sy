@@ -1,4 +1,4 @@
-package com.example.weatherapp.moonApi
+package com.example.widgetsy.moonApi
 
 data class Location(
     val city: String,

@@ -1,4 +1,4 @@
-package com.example.weatherapp
+package com.example.widgetsy
 
 import android.Manifest
 import android.app.Activity

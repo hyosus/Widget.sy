@@ -1,4 +1,4 @@
-package com.example.weatherapp.weatherApi
+package com.example.widgetsy.weatherApi
 
 data class WeatherModel(
     val current: Current,

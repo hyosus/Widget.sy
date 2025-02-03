@@ -1,4 +1,4 @@
-package com.example.weatherapp
+package com.example.widgetsy
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -8,8 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.widget.RemoteViews
-import com.example.weatherapp.moonApi.MoonViewModel
-import com.example.weatherapp.weatherApi.NetworkResponse
+import com.example.widgetsy.moonApi.MoonViewModel
+import com.example.widgetsy.weatherApi.NetworkResponse
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.abs

@@ -1,4 +1,4 @@
-package com.example.weatherapp
+package com.example.widgetsy
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -7,7 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.widget.RemoteViews
-import com.example.weatherapp.weatherApi.NetworkResponse
+import com.example.widgetsy.weatherApi.NetworkResponse
 
 class CloudWidget : AppWidgetProvider() {
     override fun onUpdate(

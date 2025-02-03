@@ -1,4 +1,4 @@
-package com.example.weatherapp.weatherApi
+package com.example.widgetsy.weatherApi
 
 object Constant {
     val weatherApiKey = "ad3ae2d2c5fb4aad94b155641240312"

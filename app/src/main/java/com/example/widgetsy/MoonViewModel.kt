@@ -1,13 +1,12 @@
 // File: app/src/main/java/com/example/weatherapp/MoonViewModel.kt
-package com.example.weatherapp.moonApi
+package com.example.widgetsy.moonApi
 
-import android.content.Context
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.weatherapp.weatherApi.Constant
-import com.example.weatherapp.weatherApi.NetworkResponse
+import com.example.widgetsy.weatherApi.Constant
+import com.example.widgetsy.weatherApi.NetworkResponse
 import kotlinx.coroutines.launch
 
 class MoonViewModel : ViewModel() {

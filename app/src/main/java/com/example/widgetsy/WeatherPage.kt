@@ -1,4 +1,4 @@
-package com.example.weatherapp
+package com.example.widgetsy
 
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
@@ -21,8 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.weatherapp.weatherApi.NetworkResponse
-import com.example.weatherapp.weatherApi.WeatherModel
+import com.example.widgetsy.weatherApi.NetworkResponse
+import com.example.widgetsy.weatherApi.WeatherModel
 
 
 @Composable

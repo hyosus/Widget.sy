@@ -1,4 +1,4 @@
-package com.example.weatherapp.weatherApi
+package com.example.widgetsy.weatherApi
 
 // T refers to WeatherModel
 sealed class NetworkResponse <out T> {

@@ -1,6 +1,5 @@
-package com.example.weatherapp.moonApi
+package com.example.widgetsy.moonApi
 
-import com.google.gson.GsonBuilder
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 

@@ -1,4 +1,4 @@
-package com.example.weatherapp.moonApi
+package com.example.widgetsy.moonApi
 
 data class MoonModel(
     val current_time: String,
