@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
@@ -26,9 +26,6 @@
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
         </provider>
 
         <activity
@@ -49,7 +46,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/moon_phase_widget_info" />
         </receiver>
-
         <receiver
             android:name=".CloudWidget"
             android:exported="false">
@@ -62,13 +58,14 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/cloud_widget_info" />
         </receiver>
-
-        <receiver android:name=".musicWidget.MusicWidgetReceiver"
+        <receiver
+            android:name=".musicWidget.MusicWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
+
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/music_widget_info" />

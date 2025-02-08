@@ -29,10 +29,12 @@ import kotlinx.coroutines.launch
 class SpotifyService(private val context: Context) {
     private val clientId = BuildConfig.SPOTIFY_CLIENT_ID
     private val redirectUri = BuildConfig.SPOTIFY_REDIRECT_URI
-    var spotifyAppRemote: SpotifyAppRemote? = null
 
     private val _currentTrack = mutableStateOf<Track?>(null)
     val currentTrack: State<Track?> get() = _currentTrack
+
+    var spotifyAppRemote: SpotifyAppRemote? = null
+    var isConnecting = false
 
     companion object {
         const val REQUEST_CODE = 1337
@@ -89,7 +91,19 @@ class SpotifyService(private val context: Context) {
         }
     }
 
-    fun connectSpotifyAppRemote() {
+    fun connectSpotifyAppRemote(onConnected: (() -> Unit)? = null) {
+        spotifyAppRemote?.let { remote ->
+            if (remote.isConnected) {
+                onConnected?.invoke()
+                return
+            }
+        }
+
+        if (isConnecting) {
+            return
+        }
+
+        isConnecting = true
         val connectionParams = ConnectionParams.Builder(clientId)
             .setRedirectUri(redirectUri)
             .showAuthView(true)
@@ -98,11 +112,15 @@ class SpotifyService(private val context: Context) {
         SpotifyAppRemote.connect(context, connectionParams, object : Connector.ConnectionListener {
             override fun onConnected(appRemote: SpotifyAppRemote) {
                 spotifyAppRemote = appRemote
+                isConnecting = false
+                onConnected?.invoke()
                 Log.d("SpotifyService", "Connected to Spotify!")
                 connected()
             }
 
             override fun onFailure(throwable: Throwable) {
+                spotifyAppRemote = null
+                isConnecting = false
                 Log.e("SpotifyService", throwable.message, throwable)
             }
         })
@@ -132,8 +150,6 @@ class SpotifyService(private val context: Context) {
         """.trimIndent()
             )
 
-
-
             val imageUri = playerState.track.imageUri
             var bgColor = 0
             _currentTrack.value?.imageUri?.let { uri ->
@@ -161,6 +177,7 @@ class SpotifyService(private val context: Context) {
                     playerState.isPaused,
                 )
             }
+
         }
     }
 
@@ -187,26 +204,22 @@ class SpotifyService(private val context: Context) {
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 // Obtain the GlanceId for the widget
-                val glanceId = GlanceAppWidgetManager(context).getGlanceIds(MusicWidget::class.java).firstOrNull()
+                val glanceId = GlanceAppWidgetManager(context).getGlanceIds(MusicWidget::class.java).firstOrNull() ?: return@launch
                 Log.d("SpotifyService", "GlanceId: $glanceId")
 
-                if (glanceId != null) {
-                    // Update the widget state
-                    updateAppWidgetState(context, glanceId) { prefs ->
-                        prefs[MusicWidget().trackNameKey] = trackName
-                        prefs[MusicWidget().artistNameKey] = artistName
-                        prefs[MusicWidget().albumArtUriKey] = imageUri
-                        prefs[MusicWidget().isPausedKey] = isPaused
-                    }
-                    Log.d("SpotifyService", "Widget state updated: Track - $trackName, Artist - $artistName, Image - $imageUri, isPaused - $isPaused")
-
-                    // Then update all widgets
-                    MusicWidget().updateAll(context)
-                    Log.d("SpotifyService", "Widget updated")
-
-                }else {
-                    Log.e("SpotifyService", "GlanceId is null, widget not found")
+                // Update the widget state
+                updateAppWidgetState(context, glanceId) { prefs ->
+                    prefs[MusicWidget().trackNameKey] = trackName
+                    prefs[MusicWidget().artistNameKey] = artistName
+                    prefs[MusicWidget().albumArtUriKey] = imageUri
+                    prefs[MusicWidget().isPausedKey] = isPaused
                 }
+                Log.d("SpotifyService", "Widget state updated: Track - $trackName, Artist - $artistName, Image - $imageUri, isPaused - $isPaused")
+
+                // Then update all widgets
+                MusicWidget().updateAll(context)
+                Log.d("SpotifyService", "Widget updated")
+
             } catch (e: Exception) {
                 Log.e("SpotifyService", "Error updating widget", e)
             }
