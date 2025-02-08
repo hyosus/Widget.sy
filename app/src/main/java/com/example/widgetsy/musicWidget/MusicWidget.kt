@@ -1,5 +1,6 @@
 package com.example.widgetsy.musicWidget
 
+import android.R.attr.tint
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -13,12 +14,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
@@ -42,6 +47,7 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.state.PreferencesGlanceStateDefinition
+import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
@@ -62,6 +68,7 @@ class MusicWidget: GlanceAppWidget() {
     val artistNameKey = stringPreferencesKey("artist_name")
     val albumArtUriKey = stringPreferencesKey("album_art_uri")
     val isPausedKey = booleanPreferencesKey("is_paused")
+    val backgroundColorKey = intPreferencesKey("background_color")
 
     override val stateDefinition = PreferencesGlanceStateDefinition
 
@@ -84,6 +91,9 @@ class MusicWidget: GlanceAppWidget() {
             if (prefs[isPausedKey] == null) {
                 prefs[isPausedKey] = true
             }
+            if (prefs[backgroundColorKey] == null) {
+                prefs[backgroundColorKey] = Color.White.toArgb()
+            }
         }
 
         provideContent {
@@ -91,11 +101,16 @@ class MusicWidget: GlanceAppWidget() {
             val artistName = currentState(key = artistNameKey) ?: "No artists"
             val albumArtUri = currentState(key = albumArtUriKey) ?: ""
             val isPaused = currentState(key = isPausedKey) ?: true
+            val bgColor = currentState(key = backgroundColorKey) ?: Color.Red.toArgb()
 
+            val textColor = getTextColor(Color(bgColor))
+
+            Log.d("MusicWidget", "BGCOLOR argbColor: $bgColor")
             Log.d("MusicWidget", "Track: $trackName, Artist: $artistName, Album Art: $albumArtUri, Is Paused: $isPaused")
 
             Scaffold(
                 modifier = GlanceModifier.fillMaxSize().padding(8.dp),
+                backgroundColor = ColorProvider(Color(bgColor))
             )
             {
                 Row {
@@ -113,13 +128,13 @@ class MusicWidget: GlanceAppWidget() {
                     Column {
                         Text(
                             text = trackName,
-                            style = TextStyle(fontSize = 20.sp, color = MyGlanceTheme.colors.primary),
+                            style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, color = ColorProvider(textColor)),
                             maxLines = 1,
                             modifier = GlanceModifier.padding(start = 12.dp)
                         )
                         Text(
                             text = artistName,
-                            style = TextStyle(color = MyGlanceTheme.colors.primary),
+                            style = TextStyle(color = ColorProvider(textColor)),
                             modifier = GlanceModifier.padding(start = 12.dp))
 
                         Row(
@@ -129,6 +144,7 @@ class MusicWidget: GlanceAppWidget() {
                                 imageProvider = ImageProvider(drawable.skip_previous),
                                 backgroundColor = null,
                                 contentDescription = "",
+                                contentColor = ColorProvider(textColor),
                                 onClick = actionRunCallback(SkipPreviousCallback::class.java),
                             )
 
@@ -139,6 +155,7 @@ class MusicWidget: GlanceAppWidget() {
                                     imageProvider = ImageProvider(drawable.play_arrow),
                                     backgroundColor = null,
                                     contentDescription = "",
+                                    contentColor = ColorProvider(textColor),
                                     onClick = actionRunCallback(ResumeCallback::class.java),
                                 )
                             } else {
@@ -146,6 +163,7 @@ class MusicWidget: GlanceAppWidget() {
                                     imageProvider = ImageProvider(drawable.pause),
                                     backgroundColor = null,
                                     contentDescription = "",
+                                    contentColor = ColorProvider(textColor),
                                     onClick = actionRunCallback(PauseCallback::class.java),
                                 )
                             }
@@ -154,6 +172,7 @@ class MusicWidget: GlanceAppWidget() {
                                 imageProvider = ImageProvider(drawable.skip_next),
                                 backgroundColor = null,
                                 contentDescription = "",
+                                contentColor = ColorProvider(textColor),
                                 onClick = actionRunCallback(SkipNextCallback::class.java),
                             )
                         }
@@ -162,6 +181,14 @@ class MusicWidget: GlanceAppWidget() {
 
             }
         }
+    }
+}
+
+fun getTextColor(bgColor: Color): Color {
+    return if (bgColor.luminance() > 0.5) {
+        Color.Black
+    } else {
+        Color.White
     }
 }
 

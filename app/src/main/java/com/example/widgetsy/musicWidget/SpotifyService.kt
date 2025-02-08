@@ -15,8 +15,10 @@ import com.spotify.sdk.android.auth.AuthorizationRequest
 import com.spotify.sdk.android.auth.AuthorizationResponse
 import com.example.widgetsy.BuildConfig
 import androidx.compose.runtime.State
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
@@ -136,63 +138,36 @@ class SpotifyService(private val context: Context) {
 
     private fun subscribeToPlayerState() {
         spotifyAppRemote?.playerApi?.subscribeToPlayerState()?.setEventCallback { playerState ->
-            // Set currentTrack from playerState
             _currentTrack.value = playerState.track
-            Log.d(
-                "SpotifyService", """
-            Current Track:
-            Name: ${playerState.track.name}
-            Artist: ${playerState.track.artist.name}
-            Album Image: ${playerState.track.imageUri}
-            URI: ${playerState.track.uri}
-            Playback Position: ${playerState.playbackPosition}
-            Is Playing: ${!playerState.isPaused}
-        """.trimIndent()
-            )
 
-            val imageUri = playerState.track.imageUri
-            var bgColor = 0
-            _currentTrack.value?.imageUri?.let { uri ->
+            playerState.track.imageUri?.let { uri ->
                 spotifyAppRemote?.imagesApi?.getImage(uri)?.setResultCallback { bitmap ->
-                    bgColor = extractDominantColor(bitmap)
+                    val palette = Palette.from(bitmap).generate()
+                    val bgColor = palette.getDominantColor(0)
+
                     Log.d("SpotifyService", "Dominant color: $bgColor")
-                }
-            }
-            if (imageUri != null) {
-                getAlbumArtUrl(imageUri) { imageUrl ->
+
+                    val imageUri = uri.raw?.replace("spotify:image:", "https://i.scdn.co/image/")
                     updateWidgetState(
                         context,
                         playerState.track.name,
                         playerState.track.artist.name,
-                        imageUrl,
+                        imageUri ?: "",
                         playerState.isPaused,
+                        bgColor
                     )
                 }
-            } else {
+            } ?: run {
                 updateWidgetState(
                     context,
                     playerState.track.name,
                     playerState.track.artist.name,
                     "",
                     playerState.isPaused,
+                    Color.White.toArgb()  // Default color when no image
                 )
             }
-
         }
-    }
-
-    private fun getAlbumArtUrl(imageUri: ImageUri, callback: (String) -> Unit) {
-        spotifyAppRemote?.imagesApi?.getImage(imageUri)?.setResultCallback { bitmap ->
-            val imageUrl = imageUri.raw?.replace("spotify:image:", "https://i.scdn.co/image/")
-            if (imageUrl != null){
-                callback(imageUrl)
-            }
-        }
-    }
-
-    fun extractDominantColor(bitmap: Bitmap): Int {
-        val palette = Palette.from(bitmap).generate()
-        return palette.getDominantColor(0)
     }
 
     private fun updateWidgetState(
@@ -200,7 +175,8 @@ class SpotifyService(private val context: Context) {
         trackName: String,
         artistName: String,
         imageUri: String,
-        isPaused: Boolean) {
+        isPaused: Boolean,
+        bgColor: Int) {
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 // Obtain the GlanceId for the widget
@@ -213,8 +189,9 @@ class SpotifyService(private val context: Context) {
                     prefs[MusicWidget().artistNameKey] = artistName
                     prefs[MusicWidget().albumArtUriKey] = imageUri
                     prefs[MusicWidget().isPausedKey] = isPaused
+                    prefs[MusicWidget().backgroundColorKey] = bgColor
                 }
-                Log.d("SpotifyService", "Widget state updated: Track - $trackName, Artist - $artistName, Image - $imageUri, isPaused - $isPaused")
+                Log.d("SpotifyService", "Widget state updated: Track - $trackName, Artist - $artistName, Image - $imageUri, isPaused - $isPaused, bgColor - $bgColor")
 
                 // Then update all widgets
                 MusicWidget().updateAll(context)
