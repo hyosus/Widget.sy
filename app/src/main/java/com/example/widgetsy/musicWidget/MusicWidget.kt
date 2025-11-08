@@ -1,6 +1,5 @@
 package com.example.widgetsy.musicWidget
 
-import android.R.attr.tint
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -23,13 +22,14 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
-import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.CircularProgressIndicator
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.components.CircleIconButton
@@ -38,6 +38,7 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.currentState
+import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
@@ -58,12 +59,12 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.toBitmap
 import com.example.widgetsy.MainActivity
-import com.example.widgetsy.MyGlanceTheme
 import com.example.widgetsy.R.drawable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class MusicWidget: GlanceAppWidget() {
+    override val sizeMode = SizeMode.Exact
     val trackNameKey = stringPreferencesKey("track_name")
     val artistNameKey = stringPreferencesKey("artist_name")
     val albumArtUriKey = stringPreferencesKey("album_art_uri")
@@ -105,21 +106,27 @@ class MusicWidget: GlanceAppWidget() {
 
             val textColor = getTextColor(Color(bgColor))
 
+            val size = LocalSize.current.height // Get the current widget size
+            Log.d("MusicWidget", "Widget size: $size")
+
+            // Calculate image size based on widget size
+            val imageHeight = size - 24.dp
+
             Log.d("MusicWidget", "BGCOLOR argbColor: $bgColor")
             Log.d("MusicWidget", "Track: $trackName, Artist: $artistName, Album Art: $albumArtUri, Is Paused: $isPaused")
 
             Scaffold(
-                modifier = GlanceModifier.fillMaxSize().padding(8.dp),
+                modifier = GlanceModifier.fillMaxSize().padding(vertical = 12.dp, horizontal = 4.dp),
                 backgroundColor = ColorProvider(Color(bgColor))
             )
             {
-                Row {
+                Row (verticalAlignment = Alignment.CenterVertically) {
                     if (albumArtUri.isNotEmpty()) {
                         Log.d("MusicWidget", "Album Art Uri: ${Uri.parse(albumArtUri)}")
 
                         ImageWidgetUrlBackgroundThread(
                             albumArtUri,
-                            modifier = GlanceModifier.size(100.dp).cornerRadius(12.dp)
+                            modifier = GlanceModifier.size(imageHeight).cornerRadius(12.dp)
                         )
                     }
 
@@ -223,7 +230,7 @@ fun ImageWidgetUrlBackgroundThread(
             Image(
                 provider = ImageProvider(bitmap),
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.FillBounds,
                 modifier = modifier,
             )
         } else {
@@ -234,18 +241,30 @@ fun ImageWidgetUrlBackgroundThread(
 
 class SpotifyCallbackManager(private val context: Context) {
     private var spotifyService: SpotifyService? = null
+    private var connecting = false
+    private val pending = mutableListOf<(SpotifyService) -> Unit>()
 
     suspend fun executeCommand(command: (SpotifyService) -> Unit) {
-        if (spotifyService?.spotifyAppRemote?.isConnected == true) {
-            command(spotifyService!!)
+        val service = spotifyService ?: SpotifyService(context).also { spotifyService = it }
+
+        if (service.spotifyAppRemote?.isConnected == true) {
+            command(service)
             return
         }
 
+        // Queue command until connected
+        pending += command
+
+        if (connecting) return
+        connecting = true
+
         withContext(Dispatchers.Main) {
-            spotifyService = SpotifyService(context).also { service ->
-                service.connectSpotifyAppRemote {
-                    command(service)
-                }
+            service.connectSpotifyAppRemote {
+                connecting = false
+                // Drain queued commands
+                val toRun = pending.toList()
+                pending.clear()
+                toRun.forEach { it(service) }
             }
         }
     }

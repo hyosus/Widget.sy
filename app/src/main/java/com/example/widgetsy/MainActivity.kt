@@ -1,16 +1,13 @@
 package com.example.widgetsy
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
-import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,34 +15,28 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.example.widgetsy.musicWidget.SpotifyService
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.unit.dp
-import androidx.palette.graphics.Palette
-import com.example.widgetsy.ui.theme.WeatherAppTheme
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.spotify.sdk.android.auth.AuthorizationClient
-import com.spotify.sdk.android.auth.AuthorizationResponse
-import com.spotify.sdk.android.auth.LoginActivity.REQUEST_CODE
+import androidx.palette.graphics.Palette
+import com.example.widgetsy.musicWidget.SpotifyService
+import com.example.widgetsy.ui.theme.WeatherAppTheme
 
 
 class MainActivity : ComponentActivity() {
@@ -57,10 +48,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         spotifyService = SpotifyService(this)
-        // Add WebView debugging here
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            WebView.setWebContentsDebuggingEnabled(true)
-        }
 
         setContent {
             WeatherAppTheme {
@@ -84,13 +71,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Only connect if already authorized
-        spotifyService.authenticateSpotify(this)
+        Log.d("MainActivity", "Authorize / connect")
+        spotifyService.authorizeIfNeeded(this)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-
         spotifyService.handleAuthResponse(requestCode, resultCode, data)
     }
 
@@ -130,7 +116,7 @@ fun CurrentTrackDisplay(spotifyService: SpotifyService) {
     Column(
         modifier = Modifier.fillMaxSize().background(backgroundColor).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        verticalArrangement = Arrangement.Center) {
 
         trackImage?.let {
             Image(
@@ -141,9 +127,10 @@ fun CurrentTrackDisplay(spotifyService: SpotifyService) {
             Log.d("MainActivity", "Image bitmap: $it")
         }
         Text(
+            modifier = Modifier.padding(top = 12.dp),
             text = currentTrack?.name ?: "No track playing",
             fontWeight = FontWeight.Bold,
-            fontSize = 24.sp)
+            fontSize = 22.sp)
         Text(text = currentTrack?.artist?.name ?: "")
 
 //        Row {

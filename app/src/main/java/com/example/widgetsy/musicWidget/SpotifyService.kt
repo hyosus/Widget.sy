@@ -1,20 +1,11 @@
 package com.example.widgetsy.musicWidget
 
-import android.util.Log
-import com.spotify.protocol.types.Track
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import androidx.compose.runtime.mutableStateOf
-import com.spotify.android.appremote.api.ConnectionParams
-import com.spotify.android.appremote.api.Connector
-import com.spotify.android.appremote.api.SpotifyAppRemote
-import com.spotify.sdk.android.auth.AuthorizationClient
-import com.spotify.sdk.android.auth.AuthorizationRequest
-import com.spotify.sdk.android.auth.AuthorizationResponse
-import com.example.widgetsy.BuildConfig
+import android.util.Log
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -23,7 +14,14 @@ import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
 import androidx.palette.graphics.Palette
-import com.spotify.protocol.types.ImageUri
+import com.example.widgetsy.BuildConfig
+import com.spotify.android.appremote.api.ConnectionParams
+import com.spotify.android.appremote.api.Connector
+import com.spotify.android.appremote.api.SpotifyAppRemote
+import com.spotify.protocol.types.Track
+import com.spotify.sdk.android.auth.AuthorizationClient
+import com.spotify.sdk.android.auth.AuthorizationRequest
+import com.spotify.sdk.android.auth.AuthorizationResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,99 +29,72 @@ import kotlinx.coroutines.launch
 class SpotifyService(private val context: Context) {
     private val clientId = BuildConfig.SPOTIFY_CLIENT_ID
     private val redirectUri = BuildConfig.SPOTIFY_REDIRECT_URI
+    private val prefs = context.getSharedPreferences("spotify_auth", Context.MODE_PRIVATE)
 
     private val _currentTrack = mutableStateOf<Track?>(null)
     val currentTrack: State<Track?> get() = _currentTrack
 
     var spotifyAppRemote: SpotifyAppRemote? = null
-    var isConnecting = false
 
     companion object {
         const val REQUEST_CODE = 1337
     }
 
-    // Add a preference to store auth state
-    private val prefs = context.getSharedPreferences("spotify_auth", Context.MODE_PRIVATE)
+    fun isAuthorized(): Boolean = prefs.getBoolean("is_authorized", false)
 
-    // Check if user is already authorized
-    fun isAuthorized(): Boolean {
-        return prefs.getBoolean("is_authorized", false)
-    }
-
-    fun authenticateSpotify(activity: Activity) {
-
-        if (!isAuthorized()) {
-            val builder = AuthorizationRequest.Builder(
-                clientId,
-                AuthorizationResponse.Type.TOKEN,
-                redirectUri
-            )
-
-            builder.setScopes(arrayOf(
-                "streaming",
-                "user-read-currently-playing",
-                "user-read-playback-state"
-            ))
-
-            val request = builder.build()
-            AuthorizationClient.openLoginActivity(activity, REQUEST_CODE, request)
-        }
-        else {
+    fun authorizeIfNeeded(activity: Activity) {
+        if (isAuthorized()) {
+            Log.d("SpotifyService", "Already authorized")
             connectSpotifyAppRemote()
+            return
         }
+        val scopes = arrayOf(
+            "streaming",
+            "user-read-currently-playing",
+            "user-read-playback-state"
+        )
+        val request = AuthorizationRequest.Builder(
+            clientId,
+            AuthorizationResponse.Type.TOKEN,
+            redirectUri
+        ).setScopes(scopes).build()
+        Log.d("SpotifyService", "Starting auth flow")
+        AuthorizationClient.openLoginActivity(activity, REQUEST_CODE, request)
     }
 
     fun handleAuthResponse(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == REQUEST_CODE) {
-            val response = AuthorizationClient.getResponse(resultCode, data)
-
-            when (response.type) {
-                AuthorizationResponse.Type.TOKEN -> {
-                    val token = response.accessToken
-                    prefs.edit().putBoolean("is_authorized", true).apply()
-                    connectSpotifyAppRemote()
-                }
-                AuthorizationResponse.Type.ERROR -> {
-                    Log.e("SpotifyService", "Auth error: ${response.error}")
-                }
-                else -> {
-                    // Handle other cases
-                }
+        if (requestCode != REQUEST_CODE) return
+        val response = AuthorizationClient.getResponse(resultCode, data)
+        when (response.type) {
+            AuthorizationResponse.Type.TOKEN -> {
+                prefs.edit().putBoolean("is_authorized", true).apply()
+                Log.d("SpotifyService", "Auth success; token len=${response.accessToken?.length ?: 0}")
+                connectSpotifyAppRemote()
             }
+            AuthorizationResponse.Type.ERROR -> {
+                Log.e("SpotifyService", "Auth error: ${response.error}")
+            }
+            else -> Log.w("SpotifyService", "Auth result: ${response.type}")
         }
     }
 
     fun connectSpotifyAppRemote(onConnected: (() -> Unit)? = null) {
-        spotifyAppRemote?.let { remote ->
-            if (remote.isConnected) {
-                onConnected?.invoke()
-                return
-            }
-        }
-
-        if (isConnecting) {
-            return
-        }
-
-        isConnecting = true
-        val connectionParams = ConnectionParams.Builder(clientId)
+        spotifyAppRemote?.let { if (it.isConnected) { onConnected?.invoke(); return } }
+        val params = ConnectionParams.Builder(clientId)
             .setRedirectUri(redirectUri)
-            .showAuthView(true)
+            .showAuthView(false) // already did explicit auth
             .build()
-
-        SpotifyAppRemote.connect(context, connectionParams, object : Connector.ConnectionListener {
+        Log.d("SpotifyService", "Connecting App Remote")
+        SpotifyAppRemote.connect(context, params, object : Connector.ConnectionListener {
             override fun onConnected(appRemote: SpotifyAppRemote) {
                 spotifyAppRemote = appRemote
-                isConnecting = false
+                Log.d("SpotifyService", "App Remote connected")
+                subscribeToPlayerState()
                 onConnected?.invoke()
-                Log.d("SpotifyService", "Connected to Spotify!")
-                connected()
             }
-
-            override fun onFailure(throwable: Throwable) {
+            override fun onFailure(t: Throwable) {
+                Log.e("SpotifyService", "Connect failed: ${t.message}", t)
                 spotifyAppRemote = null
-                isConnecting = false
-                Log.e("SpotifyService", throwable.message, throwable)
             }
         })
     }
@@ -133,7 +104,8 @@ class SpotifyService(private val context: Context) {
     }
 
     fun disconnect() {
-        SpotifyAppRemote.disconnect(spotifyAppRemote)
+        spotifyAppRemote?.let { SpotifyAppRemote.disconnect(it) }
+        spotifyAppRemote = null
     }
 
     private fun subscribeToPlayerState() {

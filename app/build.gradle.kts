@@ -80,16 +80,16 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-    implementation("androidx.compose.runtime:runtime-livedata:1.7.5")
-    implementation("com.google.android.gms:play-services-location:17.0.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.6.4")
-    implementation("org.jsoup:jsoup:1.16.1")
-    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
+    implementation("com.squareup.retrofit2:retrofit:3.0.0")
+    implementation("com.squareup.retrofit2:converter-gson:3.0.0")
+    implementation("androidx.compose.runtime:runtime-livedata:1.9.4")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    implementation("org.jsoup:jsoup:1.21.2")
+    implementation("androidx.lifecycle:lifecycle-process:2.9.4")
     // For Glance support
     implementation("androidx.glance:glance:1.1.1")
-    implementation("androidx.glance:glance-material3:1.1.0")
+    implementation("androidx.glance:glance-material3:1.1.1")
 
     // For AppWidgets support
     implementation("androidx.glance:glance-appwidget:1.1.1")
