@@ -132,20 +132,23 @@ class MusicWidget: GlanceAppWidget() {
 
                     Spacer(modifier = GlanceModifier.size(10.dp))
 
-                    Column {
+                    Column (
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             text = trackName,
                             style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, color = ColorProvider(textColor)),
                             maxLines = 1,
-                            modifier = GlanceModifier.padding(start = 12.dp)
+                            modifier = GlanceModifier.padding(start = 14.dp),
                         )
                         Text(
                             text = artistName,
                             style = TextStyle(color = ColorProvider(textColor)),
-                            modifier = GlanceModifier.padding(start = 12.dp))
+                            modifier = GlanceModifier.padding(start = 14.dp))
 
                         Row(
                             modifier = GlanceModifier.fillMaxWidth(),
+
                         ) {
                             CircleIconButton(
                                 imageProvider = ImageProvider(drawable.skip_previous),
