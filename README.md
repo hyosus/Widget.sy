@@ -17,4 +17,8 @@ Besides, star gazing / astrophotography also works best during new moon, lowerin
 ## 🎵 Spotify Player Widget
 <img src="https://github.com/user-attachments/assets/49644eaa-6850-4bed-bcfa-61cd5a9bdf65" width="600">
 <br>
+<br>
+
+> [⚠️] This widget no longer works due to changes made by Spotify to its API. API access now requires a Spotify Premium account, and I am not a paying Spotify customer, so I’m unable to update or maintain the widget under these new requirements.
+
 I made this because I did not like the design of the official Spotify's widget. My widget can not only control the music, but also change the background dynamically according to the album's art colours.
