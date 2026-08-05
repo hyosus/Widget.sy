@@ -83,38 +83,40 @@ class MoonPhaseWidget : AppWidgetProvider() {
                     }
                     is NetworkResponse.Success -> {
                         val moonData = result.data
+                        val astronomy = moonData.astronomy
 
-                        val absIllumination = abs(moonData.moon_illumination_percentage.toDouble())
+                        Log.d("Moon Data", "Moon Data: $moonData")
+                        Log.d("Moon Phase", "Moon phase: ${astronomy.moon_phase}")
+
+                        val absIllumination = abs(astronomy.moon_illumination_percentage.toDouble())
+                        val roundedIllumination = absIllumination.roundToInt()
+
                         // Moon phase
                         views.setImageViewResource(
                             R.id.moonPhaseImg,
-                            getMoonPhaseImage(context, absIllumination, moonData.moon_phase))
+                            getMoonPhaseImage(context, absIllumination, astronomy.moon_phase))
 
-                        Log.d("Moon", "FUCK YOU ${
-                            getMoonPhaseImage(
-                                context,
-                                absIllumination,
-                                moonData.moon_phase
-                            )
-                        }")
-
-                        val formattedMoonPhase = moonData.moon_phase
-                            .lowercase()
-                            .split("_")
-                            .joinToString(" ") { it.replaceFirstChar { it.uppercaseChar() } }
+                        val formattedMoonPhase = when (astronomy.moon_phase) {
+                            "FIRST_QUARTER" -> "Waxing Gibbous"
+                            "LAST_QUARTER" -> "Waning Gibbous"
+                            else -> astronomy.moon_phase
+                                .lowercase()
+                                .split("_")
+                                .joinToString(" ") { it.replaceFirstChar { it.uppercaseChar() } }
+                        }
                         views.setTextViewText(R.id.moonPhaseTxt, formattedMoonPhase)
 
                         // Moon illumination percentage
                         views.setTextViewText(
                             R.id.illuminationTxt,
-                            "${absIllumination}%"
+                            "$roundedIllumination%"
                         )
 
                         // Moonrise & Moonset
-                        val moonrise = convertTimeTo12HourFormat(moonData.moonrise)
+                        val moonrise = convertTimeTo12HourFormat(astronomy.moonrise)
                         views.setTextViewText(R.id.moonriseTxt, moonrise)
 
-                        val moonset = convertTimeTo12HourFormat(moonData.moonset)
+                        val moonset = convertTimeTo12HourFormat(astronomy.moonset)
                         views.setTextViewText(R.id.moonsetTxt, moonset)
                     }
                 }
@@ -127,46 +129,38 @@ class MoonPhaseWidget : AppWidgetProvider() {
             return prefs.getString("location", "") ?: ""
         }
 
+        /**
+         * Picks a drawable based on illumination percentage (rounded to the nearest
+         * 10) plus whether the moon is waxing or waning.
+         *
+         * NEW_MOON and FULL_MOON get their own dedicated images. Everything else
+         * falls into a waxing or waning bucket -- including the quarters, which
+         * don't get a dedicated image: FIRST_QUARTER counts as waxing,
+         * LAST_QUARTER counts as waning.
+         *
+         * Expects drawables named: new_moon, full_moon, waxing10..waxing90,
+         * waning10..waning90 (step of 10).
+         */
         fun getMoonPhaseImage(context: Context, illumination: Double, moonPhase: String): Int {
-            val imageIndex = (illumination / 10).roundToInt() * 10 // Round to nearest 10
+            val imageIndex = (illumination / 10).roundToInt() * 10 // round to nearest 10
             Log.d("Moon", "Image Index: $imageIndex")
 
-            if (imageIndex == 0) {
-                return context.resources.getIdentifier(
-                    "new_moon",
-                    "drawable",
-                    context.packageName
-                )
-            }
-            else if (imageIndex == 100 || moonPhase == "FULL_MOON") {
-                return context.resources.getIdentifier(
-                    "full_moon",
-                    "drawable",
-                    context.packageName
-                )
-            }
-            else if (moonPhase.contains("WAXING")) {
-                return context.resources.getIdentifier(
-                    "waxing$imageIndex",
-                    "drawable",
-                    context.packageName
-                )
-            }
-            else if (moonPhase.contains("WANING")) {
-                return context.resources.getIdentifier(
-                    "waning$imageIndex",
-                    "drawable",
-                    context.packageName
-                )
-            }
-            else {
-                return context.resources.getIdentifier(
-                    "waning$imageIndex",
-                    "drawable",
-                    context.packageName
-                )
+            val drawableName = when {
+                imageIndex <= 0 -> "new_moon"
+                imageIndex >= 100 -> "full_moon"
+                moonPhase.contains("WAXING") || moonPhase == "FIRST_QUARTER" -> "waxing$imageIndex"
+                moonPhase.contains("WANING") || moonPhase == "LAST_QUARTER" -> "waning$imageIndex"
+                else -> {
+                    Log.d("Moon", "Unrecognized moon phase: $moonPhase")
+                    "full_moon"
+                }
             }
 
+            return context.resources.getIdentifier(
+                drawableName,
+                "drawable",
+                context.packageName
+            )
         }
 
         private fun convertTimeTo12HourFormat(time24: String): String {
@@ -177,4 +171,3 @@ class MoonPhaseWidget : AppWidgetProvider() {
         }
     }
 }
-

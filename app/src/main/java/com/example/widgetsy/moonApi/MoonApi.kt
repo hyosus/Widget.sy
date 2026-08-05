@@ -5,7 +5,7 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 
 interface MoonApi {
-    @GET("/astronomy")
+    @GET("/v3/astronomy")
     suspend fun getMoon(
         @Query("apiKey") apiKey: String,
         @Query("location") location: String
