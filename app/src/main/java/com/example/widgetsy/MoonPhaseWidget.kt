@@ -82,42 +82,48 @@ class MoonPhaseWidget : AppWidgetProvider() {
                         Log.d("Moon", "Loading...")
                     }
                     is NetworkResponse.Success -> {
-                        val moonData = result.data
-                        val astronomy = moonData.astronomy
+                        try {
+                            val moonData = result.data
+                            val astronomy = moonData.astronomy
 
-                        Log.d("Moon Data", "Moon Data: $moonData")
-                        Log.d("Moon Phase", "Moon phase: ${astronomy.moon_phase}")
+                            Log.d("Moon Data", "Moon Data: ${moonData.astronomy}")
+                            Log.d("Moon Phase", "Moon phase: ${astronomy.moon_phase}")
 
-                        val absIllumination = abs(astronomy.moon_illumination_percentage.toDouble())
-                        val roundedIllumination = absIllumination.roundToInt()
+                            val absIllumination = abs(astronomy.moon_illumination_percentage.toDouble())
+                            val roundedIllumination = absIllumination.roundToInt()
 
-                        // Moon phase
-                        views.setImageViewResource(
-                            R.id.moonPhaseImg,
-                            getMoonPhaseImage(context, absIllumination, astronomy.moon_phase))
+                            // Moon phase
+                            views.setImageViewResource(
+                                R.id.moonPhaseImg,
+                                getMoonPhaseImage(context, absIllumination, astronomy.moon_phase))
 
-                        val formattedMoonPhase = when (astronomy.moon_phase) {
-                            "FIRST_QUARTER" -> "Waxing Gibbous"
-                            "LAST_QUARTER" -> "Waning Gibbous"
-                            else -> astronomy.moon_phase
-                                .lowercase()
-                                .split("_")
-                                .joinToString(" ") { it.replaceFirstChar { it.uppercaseChar() } }
+                            val formattedMoonPhase = when (astronomy.moon_phase) {
+                                "FIRST_QUARTER" -> "Waxing Gibbous"
+                                "LAST_QUARTER" -> "Waning Gibbous"
+                                else -> astronomy.moon_phase
+                                    .lowercase()
+                                    .split("_")
+                                    .joinToString(" ") { it.replaceFirstChar { it.uppercaseChar() } }
+                            }
+                            views.setTextViewText(R.id.moonPhaseTxt, formattedMoonPhase)
+
+                            Log.d("Formatted Moon details", "Formatted Moon details: $formattedMoonPhase, Illumination: $roundedIllumination%")
+
+                            // Moon illumination percentage
+                            views.setTextViewText(
+                                R.id.illuminationTxt,
+                                "$roundedIllumination%"
+                            )
+
+                            // Moonrise & Moonset
+                            val moonrise = convertTimeTo12HourFormat(astronomy.moonrise)
+                            views.setTextViewText(R.id.moonriseTxt, moonrise)
+
+                            val moonset = convertTimeTo12HourFormat(astronomy.moonset)
+                            views.setTextViewText(R.id.moonsetTxt, moonset)
+                        } catch (e: Exception) {
+                            Log.e("Moon", "Failed to render widget from data: $e")
                         }
-                        views.setTextViewText(R.id.moonPhaseTxt, formattedMoonPhase)
-
-                        // Moon illumination percentage
-                        views.setTextViewText(
-                            R.id.illuminationTxt,
-                            "$roundedIllumination%"
-                        )
-
-                        // Moonrise & Moonset
-                        val moonrise = convertTimeTo12HourFormat(astronomy.moonrise)
-                        views.setTextViewText(R.id.moonriseTxt, moonrise)
-
-                        val moonset = convertTimeTo12HourFormat(astronomy.moonset)
-                        views.setTextViewText(R.id.moonsetTxt, moonset)
                     }
                 }
                 appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -164,10 +170,19 @@ class MoonPhaseWidget : AppWidgetProvider() {
         }
 
         private fun convertTimeTo12HourFormat(time24: String): String {
-            val inputFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-            val outputFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-            val date = inputFormat.parse(time24)
-            return date?.let { outputFormat.format(it) } ?: "Invalid time"
+            // API returns "-:-" when the moon doesn't rise/set on a given day
+            // (e.g. near the poles, or certain phases) -- not a real time to parse.
+            if (time24 == "-:-") return "-"
+
+            return try {
+                val inputFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+                val outputFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+                val date = inputFormat.parse(time24)
+                date?.let { outputFormat.format(it) } ?: "-"
+            } catch (e: Exception) {
+                Log.d("Moon", "Failed to parse time: $time24")
+                "-"
+            }
         }
     }
 }
