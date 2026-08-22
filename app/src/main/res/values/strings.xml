@@ -3,6 +3,7 @@
     <string name="appwidget_text">EXAMPLE</string>
     <string name="add_widget">Add widget</string>
     <string name="app_widget_description">This is an app widget description</string>
+    <string name="dap_widget_description">Widget to display current music playing on Hiby DAP</string>
     <string name="title_activity_widget_setting">WidgetSetting</string>
     <string name="title_activity_widget_settings">WidgetSettingsActivity</string>
     <string name="title_activity_main2">MainActivity2</string>
