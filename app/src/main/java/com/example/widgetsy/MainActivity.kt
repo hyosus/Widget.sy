@@ -90,8 +90,6 @@ class MainActivity : ComponentActivity() {
             Log.d("MainActivity", "Permission granted but not connected — requesting rebind")
             val componentName = ComponentName(this, MediaListenerService::class.java)
             NotificationListenerService.requestRebind(componentName)
-        } else {
-            MediaListenerService.instance?.getCurrentMediaInfo()
         }
     }
 
