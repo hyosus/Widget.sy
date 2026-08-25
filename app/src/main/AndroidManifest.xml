@@ -68,7 +68,7 @@
                 android:resource="@xml/cloud_widget_info" />
         </receiver>
         <receiver
-            android:name=".musicWidget.MusicWidgetReceiver"
+            android:name=".musicWidget.normal.MusicWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

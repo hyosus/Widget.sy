@@ -3,7 +3,6 @@ package com.example.widgetsy
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
@@ -22,7 +21,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.palette.graphics.Palette
 import com.example.widgetsy.musicWidget.MediaListenerService
 import com.example.widgetsy.ui.theme.WeatherAppTheme
 
@@ -52,11 +50,6 @@ class MainActivity : ComponentActivity() {
         }
 
         requestIgnoreBatteryOptimizations(this)
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        Log.d("AuthFlow", "Received intent: ${intent.data}") // Log redirect URI
     }
 
     private fun isNotificationServiceEnabled(): Boolean {

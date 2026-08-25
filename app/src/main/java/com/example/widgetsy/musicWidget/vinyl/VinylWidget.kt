@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -41,7 +40,8 @@ import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.widgetsy.R
-import com.example.widgetsy.musicWidget.MusicWidgetKeys
+import com.example.widgetsy.musicWidget.MusicWidgetState
+import com.example.widgetsy.musicWidget.toMusicWidgetState
 
 @Suppress("RestrictedApi")
 class VinylWidget : GlanceAppWidget() {
@@ -53,25 +53,29 @@ class VinylWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
             val prefs = currentState<Preferences>()
-            val title = prefs[MusicWidgetKeys.TITLE] ?: "No track playing"
-            val artist = prefs[MusicWidgetKeys.ARTIST] ?: "Unknown artist"
-            val isPlaying = prefs[MusicWidgetKeys.IS_PLAYING] ?: false
-            val albumArtPath = prefs[MusicWidgetKeys.ALBUM_ART_PATH]
-            val albumArtBitmap = albumArtPath?.let { BitmapFactory.decodeFile(it) }
-            val blurredArtPath = prefs[MusicWidgetKeys.BLURRED_ART_PATH]
-            val blurredArtBitmap = blurredArtPath?.let { BitmapFactory.decodeFile(it) }
+            val state = prefs.toMusicWidgetState { path -> BitmapFactory.decodeFile(path) }
 
             val size = LocalSize.current
-
-            Log.d("SizeCheck", "Widget size: width=${size.width}, height=${size.height}")
             // Tall/roughly-square layout kicks in once height catches up to width
             // (your 3x1/4x1 wide layout has height << width; 2x2 is closer to square/taller)
             val isTallLayout = size.height >= size.width * 0.6f
 
-            if (isTallLayout) {
-                TallVinylLayout(title, artist, albumArtBitmap, blurredArtBitmap)
-            } else {
-                WideVinylLayout(title, artist, isPlaying, albumArtBitmap)
+            when (state) {
+                is MusicWidgetState.NoTrack -> {
+                    if (isTallLayout) {
+                        TallVinylLayout("No track playing", "No artist", null, null)
+                    } else {
+                        WideVinylLayout("No track playing", "No artist", isPlaying = false, albumArtBitmap = null)
+                    }
+                }
+
+                is MusicWidgetState.Completed -> {
+                    if (isTallLayout) {
+                        TallVinylLayout(state.title, state.artist, state.albumArt, state.blurredArt)
+                    } else {
+                        WideVinylLayout(state.title, state.artist, state.isPlaying, state.albumArt)
+                    }
+                }
             }
         }
     }
@@ -132,7 +136,8 @@ private fun WideVinylLayout(
                         color = ColorProvider(Color.White),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                    )
+                    ),
+                    maxLines = 2
                 )
             }
         }
