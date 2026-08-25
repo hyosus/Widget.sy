@@ -23,8 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.palette.graphics.Palette
-import com.example.widgetsy.ui.theme.WeatherAppTheme
 import com.example.widgetsy.musicWidget.MediaListenerService
+import com.example.widgetsy.ui.theme.WeatherAppTheme
 
 
 class MainActivity : ComponentActivity() {

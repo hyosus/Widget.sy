@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
@@ -68,7 +69,7 @@ class VinylWidget : GlanceAppWidget() {
             val isTallLayout = size.height >= size.width * 0.6f
 
             if (isTallLayout) {
-                TallVinylLayout(title, artist, isPlaying, albumArtBitmap, blurredArtBitmap)
+                TallVinylLayout(title, artist, albumArtBitmap, blurredArtBitmap)
             } else {
                 WideVinylLayout(title, artist, isPlaying, albumArtBitmap)
             }
@@ -179,15 +180,14 @@ private fun WideVinylLayout(
 private fun TallVinylLayout(
     title: String,
     artist: String,
-    isPlaying: Boolean,
     albumArtBitmap: Bitmap?,
     blurredArtBitmap: Bitmap?,
 ) {
     val size = LocalSize.current
-    var vinylSize = 0.dp
-    var vinylBoxSize = 0.dp
-    var artSize = 0.dp
-    var vinylBg = 0.dp
+    var vinylSize: Dp
+    var vinylBoxSize: Dp
+    var artSize: Dp
+    var vinylBg: Dp
 
     if (size.width > size.height) {
         vinylSize = size.height

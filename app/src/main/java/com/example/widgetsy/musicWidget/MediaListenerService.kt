@@ -11,8 +11,8 @@ import android.util.Log
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
-import com.example.widgetsy.utils.blurBitmap
 import com.example.widgetsy.musicWidget.vinyl.VinylWidget
+import com.example.widgetsy.utils.blurBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,7 +28,6 @@ class MediaListenerService : NotificationListenerService() {
         var instance: MediaListenerService? = null
         var isConnected: Boolean = false
         private const val TARGET_PACKAGE = "com.hiby.music"
-        private const val ALBUM_ART_FILENAME = "widget_album_art.png"
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.Main)
