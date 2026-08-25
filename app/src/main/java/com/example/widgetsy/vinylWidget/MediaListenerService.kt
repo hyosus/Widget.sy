@@ -1,4 +1,4 @@
-package com.example.widgetsy.dapWidget
+package com.example.widgetsy.vinylWidget
 
 import android.content.ComponentName
 import android.media.session.MediaController
@@ -7,10 +7,10 @@ import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
-import androidx.glance.GlanceId
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
+import com.example.widgetsy.utils.blurBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -124,28 +124,34 @@ class MediaListenerService : NotificationListenerService() {
             ?: metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
 
         val artPath = artBitmap?.let { saveAlbumArtToFile(it) }
+        val blurredArtPath = artBitmap?.let { saveBitmapToFile(blurBitmap(it, radius = 20), "blurred_art") }
 
         Log.d("MediaListener", "Updated info: title=$title, artist=$artist, playing=$isPlaying")
         Log.d("MediaListener", "artBitmap hash=${artBitmap?.let { System.identityHashCode(it) }}, size=${artBitmap?.byteCount}")
 
         serviceScope.launch {
             val manager = GlanceAppWidgetManager(applicationContext)
-            val glanceIds = manager.getGlanceIds(DapWidget::class.java)
+            val glanceIds = manager.getGlanceIds(VinylWidget::class.java)
 
             glanceIds.forEach { id ->
                 updateAppWidgetState(applicationContext, id) { prefs ->
-                    prefs[WidgetKeys.TITLE] = title
-                    prefs[WidgetKeys.ARTIST] = artist
-                    prefs[WidgetKeys.IS_PLAYING] = isPlaying
+                    prefs[VinylWidgetKeys.TITLE] = title
+                    prefs[VinylWidgetKeys.ARTIST] = artist
+                    prefs[VinylWidgetKeys.IS_PLAYING] = isPlaying
                     if (artPath != null) {
-                        prefs[WidgetKeys.ALBUM_ART_PATH] = artPath
+                        prefs[VinylWidgetKeys.ALBUM_ART_PATH] = artPath
                     } else {
-                        prefs.remove(WidgetKeys.ALBUM_ART_PATH)
+                        prefs.remove(VinylWidgetKeys.ALBUM_ART_PATH)
+                    }
+                    if (blurredArtPath != null) {
+                        prefs[VinylWidgetKeys.BLURRED_ART_PATH] = blurredArtPath
+                    } else {
+                        prefs.remove(VinylWidgetKeys.BLURRED_ART_PATH)
                     }
                 }
             }
 
-            DapWidget().updateAll(applicationContext)
+            VinylWidget().updateAll(applicationContext)
         }
     }
 
@@ -160,20 +166,23 @@ class MediaListenerService : NotificationListenerService() {
     }
 
     // Bitmaps can't be stored in Preferences directly — write to a file, store the path.
-    private fun saveAlbumArtToFile(bitmap: android.graphics.Bitmap): String? {
+    private fun saveAlbumArtToFile(bitmap: android.graphics.Bitmap): String? =
+        saveBitmapToFile(bitmap, "album_art")
+
+    private fun saveBitmapToFile(bitmap: android.graphics.Bitmap, prefix: String): String? {
         return try {
-            val file = File(applicationContext.cacheDir, "album_art_${System.currentTimeMillis()}.png")
+            val file = File(applicationContext.cacheDir, "${prefix}_${System.currentTimeMillis()}.png")
             FileOutputStream(file).use { out ->
                 bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
                 out.flush()
             }
-            // Clean up old art files so cache doesn't grow forever
-            applicationContext.cacheDir.listFiles { f -> f.name.startsWith("album_art_") && f.name != file.name }
+            // Clean up old files with the same prefix so cache doesn't grow forever
+            applicationContext.cacheDir.listFiles { f -> f.name.startsWith("${prefix}_") && f.name != file.name }
                 ?.forEach { it.delete() }
 
             file.absolutePath
         } catch (e: Exception) {
-            Log.e("MediaListener", "Failed to save album art", e)
+            Log.e("MediaListener", "Failed to save $prefix", e)
             null
         }
     }

@@ -38,9 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.LocalContext
 import androidx.palette.graphics.Palette
-import com.example.widgetsy.dapWidget.MediaListenerService
 import com.example.widgetsy.musicWidget.SpotifyService
 import com.example.widgetsy.ui.theme.WeatherAppTheme
+import com.example.widgetsy.vinylWidget.MediaListenerService
 
 
 class MainActivity : ComponentActivity() {
@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        spotifyService = SpotifyService(this)
+//        spotifyService = SpotifyService(this)
 
         setContent {
             WeatherAppTheme {
@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Log.d("MainActivity", "Authorize / connect")
-        spotifyService.authorizeIfNeeded(this)
+//        spotifyService.authorizeIfNeeded(this)
 
         if (!isNotificationServiceEnabled()) {
             Log.d("MainActivity", "Notification listener NOT enabled — opening settings")
