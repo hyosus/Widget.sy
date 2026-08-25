@@ -89,7 +89,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-fun getPrimaryColorFromImage(bitmap: Bitmap): Int {
-    val palette = Palette.from(bitmap).generate()
-    return palette.getDominantColor(0) // Default color if no dominant color is found
-}

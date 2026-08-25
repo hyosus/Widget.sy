@@ -8,11 +8,16 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
 import android.util.Log
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
+import com.example.widgetsy.musicWidget.normal.MusicWidget
 import com.example.widgetsy.musicWidget.vinyl.VinylWidget
 import com.example.widgetsy.utils.blurBitmap
+import com.example.widgetsy.utils.getPrimaryColorFromImage
+import com.example.widgetsy.utils.getTextColor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -81,18 +86,6 @@ class MediaListenerService : NotificationListenerService() {
         activeController = null
     }
 
-    // A new/removed notification can mean a media app started or stopped —
-    // re-check active sessions so we pick up new controllers.
-//    override fun onNotificationPosted(sbn: StatusBarNotification?) {
-//        super.onNotificationPosted(sbn)
-//        val sessionManager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
-//        val componentName = ComponentName(this, MediaListenerService::class.java)
-//        try {
-//            attachToBestController(sessionManager.getActiveSessions(componentName))
-//        } catch (e: SecurityException) {
-//            Log.e("MediaListener", "Missing permission to get sessions", e)
-//        }
-//    }
 
     private fun attachToBestController(controllers: List<MediaController>) {
         val hibyController = controllers.firstOrNull {
@@ -128,15 +121,18 @@ class MediaListenerService : NotificationListenerService() {
 
         val artPath = artBitmap?.let { saveAlbumArtToFile(it) }
         val blurredArtPath = artBitmap?.let { saveBitmapToFile(blurBitmap(it, radius = 20), "blurred_art") }
+        val dynamicBgColor = artBitmap?.let { getPrimaryColorFromImage(it) }
+        val dynamicTextColor = dynamicBgColor?.let { getTextColor(Color(it)) }
 
         Log.d("MediaListener", "Updated info: title=$title, artist=$artist, playing=$isPlaying")
         Log.d("MediaListener", "artBitmap hash=${artBitmap?.let { System.identityHashCode(it) }}, size=${artBitmap?.byteCount}")
 
         serviceScope.launch {
             val manager = GlanceAppWidgetManager(applicationContext)
-            val glanceIds = manager.getGlanceIds(VinylWidget::class.java)
+            val vinylGlanceIds = manager.getGlanceIds(VinylWidget::class.java)
+            val normalGlanceIds = manager.getGlanceIds(MusicWidget::class.java)
 
-            glanceIds.forEach { id ->
+            vinylGlanceIds.forEach { id ->
                 updateAppWidgetState(applicationContext, id) { prefs ->
                     prefs[MusicWidgetKeys.TITLE] = title
                     prefs[MusicWidgetKeys.ARTIST] = artist
@@ -154,6 +150,26 @@ class MediaListenerService : NotificationListenerService() {
                 }
             }
 
+            normalGlanceIds.forEach { id ->
+                updateAppWidgetState(applicationContext, id) { prefs ->
+                    prefs[MusicWidgetKeys.TITLE] = title
+                    prefs[MusicWidgetKeys.ARTIST] = artist
+                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
+                    if (artPath != null) {
+                        prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
+                    } else {
+                        prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
+                    }
+                    if (dynamicBgColor != null) {
+                        prefs[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR] = dynamicBgColor
+                    } else {
+                        prefs.remove(MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR)
+                    }
+                    prefs[MusicWidgetKeys.DYNAMIC_TEXT_COLOR] = dynamicTextColor?.toArgb() ?: 1
+                }
+            }
+
+            MusicWidget().updateAll(applicationContext)
             VinylWidget().updateAll(applicationContext)
         }
     }
