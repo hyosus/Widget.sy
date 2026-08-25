@@ -2,7 +2,6 @@ package com.example.widgetsy.musicWidget
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Log
@@ -26,13 +25,9 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
-import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.CircularProgressIndicator
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.action.ActionCallback
-import androidx.glance.appwidget.action.actionRunCallback
-import androidx.glance.appwidget.components.CircleIconButton
 import androidx.glance.appwidget.components.Scaffold
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -58,8 +53,6 @@ import coil3.request.ErrorResult
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.toBitmap
-import com.example.widgetsy.MainActivity
-import com.example.widgetsy.R.drawable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -150,41 +143,35 @@ class MusicWidget: GlanceAppWidget() {
                             modifier = GlanceModifier.fillMaxWidth(),
 
                         ) {
-                            CircleIconButton(
-                                imageProvider = ImageProvider(drawable.skip_previous),
-                                backgroundColor = null,
-                                contentDescription = "",
-                                contentColor = ColorProvider(textColor),
-                                onClick = actionRunCallback(SkipPreviousCallback::class.java),
-                            )
-
-                            Log.d("MusicWidget", "Is paused: $isPaused")
-
-                            if (isPaused) {
-                                CircleIconButton(
-                                    imageProvider = ImageProvider(drawable.play_arrow),
-                                    backgroundColor = null,
-                                    contentDescription = "",
-                                    contentColor = ColorProvider(textColor),
-                                    onClick = actionRunCallback(ResumeCallback::class.java),
-                                )
-                            } else {
-                                CircleIconButton(
-                                    imageProvider = ImageProvider(drawable.pause),
-                                    backgroundColor = null,
-                                    contentDescription = "",
-                                    contentColor = ColorProvider(textColor),
-                                    onClick = actionRunCallback(PauseCallback::class.java),
-                                )
-                            }
-
-                            CircleIconButton(
-                                imageProvider = ImageProvider(drawable.skip_next),
-                                backgroundColor = null,
-                                contentDescription = "",
-                                contentColor = ColorProvider(textColor),
-                                onClick = actionRunCallback(SkipNextCallback::class.java),
-                            )
+//                            CircleIconButton(
+//                                imageProvider = ImageProvider(drawable.skip_previous),
+//                                backgroundColor = null,
+//                                contentDescription = "",
+//                                contentColor = ColorProvider(textColor),
+//                            )
+//
+//                            if (isPaused) {
+//                                CircleIconButton(
+//                                    imageProvider = ImageProvider(drawable.play_arrow),
+//                                    backgroundColor = null,
+//                                    contentDescription = "",
+//                                    contentColor = ColorProvider(textColor),
+//                                )
+//                            } else {
+//                                CircleIconButton(
+//                                    imageProvider = ImageProvider(drawable.pause),
+//                                    backgroundColor = null,
+//                                    contentDescription = "",
+//                                    contentColor = ColorProvider(textColor)
+//                                )
+//                            }
+//
+//                            CircleIconButton(
+//                                imageProvider = ImageProvider(drawable.skip_next),
+//                                backgroundColor = null,
+//                                contentDescription = "",
+//                                contentColor = ColorProvider(textColor)
+//                            )
                         }
                     }
                 }
@@ -239,86 +226,5 @@ fun ImageWidgetUrlBackgroundThread(
         } else {
             CircularProgressIndicator(modifier)
         }
-    }
-}
-
-class SpotifyCallbackManager(private val context: Context) {
-    private var spotifyService: SpotifyService? = null
-    private var connecting = false
-    private val pending = mutableListOf<(SpotifyService) -> Unit>()
-
-    suspend fun executeCommand(command: (SpotifyService) -> Unit) {
-        val service = spotifyService ?: SpotifyService(context).also { spotifyService = it }
-
-        if (service.spotifyAppRemote?.isConnected == true) {
-            command(service)
-            return
-        }
-
-        // Queue command until connected
-        pending += command
-
-        if (connecting) return
-        connecting = true
-
-        withContext(Dispatchers.Main) {
-            service.connectSpotifyAppRemote {
-                connecting = false
-                // Drain queued commands
-                val toRun = pending.toList()
-                pending.clear()
-                toRun.forEach { it(service) }
-            }
-        }
-    }
-}
-
-abstract class BaseSpotifyCallback : ActionCallback {
-    abstract fun executeSpotifyCommand(spotifyService: SpotifyService)
-
-    override suspend fun onAction(
-        context: Context,
-        glanceId: GlanceId,
-        parameters: ActionParameters
-    ) {
-        val prefs = context.getSharedPreferences("spotify_auth", Context.MODE_PRIVATE)
-
-        if (prefs.getBoolean("is_authorized", false)) {
-            // Create a new manager instance each time, but reuse the SpotifyAppRemote connection
-            SpotifyCallbackManager(context).executeCommand { service ->
-                executeSpotifyCommand(service)
-            }
-        } else {
-            withContext(Dispatchers.Main) {
-                val intent = Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                context.startActivity(intent)
-            }
-        }
-    }
-}
-// Specific callback implementations
-class SkipNextCallback : BaseSpotifyCallback() {
-    override fun executeSpotifyCommand(spotifyService: SpotifyService) {
-        spotifyService.skipToNext()
-    }
-}
-
-class SkipPreviousCallback : BaseSpotifyCallback() {
-    override fun executeSpotifyCommand(spotifyService: SpotifyService) {
-        spotifyService.skipToPrevious()
-    }
-}
-
-class PauseCallback : BaseSpotifyCallback() {
-    override fun executeSpotifyCommand(spotifyService: SpotifyService) {
-        spotifyService.pause()
-    }
-}
-
-class ResumeCallback : BaseSpotifyCallback() {
-    override fun executeSpotifyCommand(spotifyService: SpotifyService) {
-        spotifyService.resume()
     }
 }

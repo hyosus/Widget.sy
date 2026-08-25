@@ -1,18 +1,22 @@
-package com.example.widgetsy.vinylWidget
+package com.example.widgetsy.musicWidget
 
 import android.content.ComponentName
+import android.graphics.Bitmap
+import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.service.notification.NotificationListenerService
-import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
 import com.example.widgetsy.utils.blurBitmap
+import com.example.widgetsy.musicWidget.vinyl.VinylWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -31,7 +35,7 @@ class MediaListenerService : NotificationListenerService() {
     private var activeController: MediaController? = null
 
     private val controllerCallback = object : MediaController.Callback() {
-        override fun onMetadataChanged(metadata: android.media.MediaMetadata?) {
+        override fun onMetadataChanged(metadata: MediaMetadata?) {
             refreshFromController()
         }
 
@@ -117,11 +121,11 @@ class MediaListenerService : NotificationListenerService() {
         val controller = activeController
         val metadata = controller?.metadata
 
-        val title = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""
-        val artist = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
+        val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
         val isPlaying = controller?.playbackState?.state == PlaybackState.STATE_PLAYING
-        val artBitmap = metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
-            ?: metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
+        val artBitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+            ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
 
         val artPath = artBitmap?.let { saveAlbumArtToFile(it) }
         val blurredArtPath = artBitmap?.let { saveBitmapToFile(blurBitmap(it, radius = 20), "blurred_art") }
@@ -135,18 +139,18 @@ class MediaListenerService : NotificationListenerService() {
 
             glanceIds.forEach { id ->
                 updateAppWidgetState(applicationContext, id) { prefs ->
-                    prefs[VinylWidgetKeys.TITLE] = title
-                    prefs[VinylWidgetKeys.ARTIST] = artist
-                    prefs[VinylWidgetKeys.IS_PLAYING] = isPlaying
+                    prefs[MusicWidgetKeys.TITLE] = title
+                    prefs[MusicWidgetKeys.ARTIST] = artist
+                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
                     if (artPath != null) {
-                        prefs[VinylWidgetKeys.ALBUM_ART_PATH] = artPath
+                        prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
                     } else {
-                        prefs.remove(VinylWidgetKeys.ALBUM_ART_PATH)
+                        prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
                     }
                     if (blurredArtPath != null) {
-                        prefs[VinylWidgetKeys.BLURRED_ART_PATH] = blurredArtPath
+                        prefs[MusicWidgetKeys.BLURRED_ART_PATH] = blurredArtPath
                     } else {
-                        prefs.remove(VinylWidgetKeys.BLURRED_ART_PATH)
+                        prefs.remove(MusicWidgetKeys.BLURRED_ART_PATH)
                     }
                 }
             }
@@ -155,25 +159,26 @@ class MediaListenerService : NotificationListenerService() {
         }
     }
 
-    private var refreshJob: kotlinx.coroutines.Job? = null
+    private var refreshJob: Job? = null
 
     private fun refreshFromController() {
         refreshJob?.cancel()
         refreshJob = serviceScope.launch {
-            kotlinx.coroutines.delay(1500.milliseconds) // wait for the burst to settle
+            delay(1500.milliseconds) // wait for the burst to settle
             doRefresh()
         }
     }
 
     // Bitmaps can't be stored in Preferences directly — write to a file, store the path.
-    private fun saveAlbumArtToFile(bitmap: android.graphics.Bitmap): String? =
+    private fun saveAlbumArtToFile(bitmap: Bitmap): String? =
         saveBitmapToFile(bitmap, "album_art")
 
-    private fun saveBitmapToFile(bitmap: android.graphics.Bitmap, prefix: String): String? {
+    private fun saveBitmapToFile(bitmap: Bitmap, prefix: String): String? {
         return try {
-            val file = File(applicationContext.cacheDir, "${prefix}_${System.currentTimeMillis()}.png")
+            val file =
+                File(applicationContext.cacheDir, "${prefix}_${System.currentTimeMillis()}.png")
             FileOutputStream(file).use { out ->
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                 out.flush()
             }
             // Clean up old files with the same prefix so cache doesn't grow forever

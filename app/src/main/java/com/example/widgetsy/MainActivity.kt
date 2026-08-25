@@ -13,8 +13,6 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,43 +20,31 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.glance.LocalContext
 import androidx.palette.graphics.Palette
-import com.example.widgetsy.musicWidget.SpotifyService
 import com.example.widgetsy.ui.theme.WeatherAppTheme
-import com.example.widgetsy.vinylWidget.MediaListenerService
+import com.example.widgetsy.musicWidget.MediaListenerService
 
 
 class MainActivity : ComponentActivity() {
-    private lateinit var spotifyService: SpotifyService
-
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-//        spotifyService = SpotifyService(this)
-
         setContent {
             WeatherAppTheme {
                 Scaffold()
                 { innerPadding ->
-                    Column(modifier = Modifier.padding(innerPadding)) {
-//                        CurrentTrackDisplay(spotifyService)
+                    Column(
+                        modifier = Modifier.padding(innerPadding).fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                        Text(
+                            text = "Nothing implemented here yet 😶"
+                        )
                     }
                 }
 
@@ -80,8 +66,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        Log.d("MainActivity", "Authorize / connect")
-//        spotifyService.authorizeIfNeeded(this)
 
         if (!isNotificationServiceEnabled()) {
             Log.d("MainActivity", "Notification listener NOT enabled — opening settings")
@@ -92,11 +76,6 @@ class MainActivity : ComponentActivity() {
             NotificationListenerService.requestRebind(componentName)
         }
     }
-
-//    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-//        super.onActivityResult(requestCode, resultCode, data)
-//        spotifyService.handleAuthResponse(requestCode, resultCode, data)
-//    }
 
     fun requestIgnoreBatteryOptimizations(context: Context) {
         val intent = Intent()
@@ -114,42 +93,3 @@ fun getPrimaryColorFromImage(bitmap: Bitmap): Int {
     val palette = Palette.from(bitmap).generate()
     return palette.getDominantColor(0) // Default color if no dominant color is found
 }
-
-//@Composable
-//fun CurrentTrackDisplay(spotifyService: SpotifyService) {
-//    val currentTrack by spotifyService.currentTrack
-//    var trackImage by remember { mutableStateOf<ImageBitmap?>(null) }
-//    var backgroundColor by remember { mutableStateOf(Color.White) }
-//
-//    LaunchedEffect(currentTrack) {
-//        spotifyService.getTrackImage { imageBitmap ->
-//            trackImage = imageBitmap
-//            imageBitmap?.let {
-//                backgroundColor = Color(getPrimaryColorFromImage(it.asAndroidBitmap()))
-//                Log.d("MainActivity", "Background color: $backgroundColor")
-//            }
-//        }
-//    }
-//
-//    Column(
-//        modifier = Modifier.fillMaxSize().background(backgroundColor).padding(16.dp),
-//        horizontalAlignment = Alignment.CenterHorizontally,
-//        verticalArrangement = Arrangement.Center) {
-//
-//        trackImage?.let {
-//            Image(
-//                bitmap = it,
-//                contentDescription = "Album Image"
-//            )
-//
-//            Log.d("MainActivity", "Image bitmap: $it")
-//        }
-//        Text(
-//            modifier = Modifier.padding(top = 12.dp),
-//            text = currentTrack?.name ?: "No track playing",
-//            fontWeight = FontWeight.Bold,
-//            fontSize = 22.sp)
-//        Text(text = currentTrack?.artist?.name ?: "")
-//
-//    }
-//}

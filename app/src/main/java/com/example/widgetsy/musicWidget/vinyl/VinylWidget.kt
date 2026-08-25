@@ -1,12 +1,12 @@
-package com.example.widgetsy.vinylWidget
+package com.example.widgetsy.musicWidget.vinyl
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
@@ -17,7 +17,6 @@ import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.background
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -41,6 +40,7 @@ import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.widgetsy.R
+import com.example.widgetsy.musicWidget.MusicWidgetKeys
 
 @Suppress("RestrictedApi")
 class VinylWidget : GlanceAppWidget() {
@@ -52,12 +52,12 @@ class VinylWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
             val prefs = currentState<Preferences>()
-            val title = prefs[VinylWidgetKeys.TITLE] ?: "No track playing"
-            val artist = prefs[VinylWidgetKeys.ARTIST] ?: "Unknown artist"
-            val isPlaying = prefs[VinylWidgetKeys.IS_PLAYING] ?: false
-            val albumArtPath = prefs[VinylWidgetKeys.ALBUM_ART_PATH]
+            val title = prefs[MusicWidgetKeys.TITLE] ?: "No track playing"
+            val artist = prefs[MusicWidgetKeys.ARTIST] ?: "Unknown artist"
+            val isPlaying = prefs[MusicWidgetKeys.IS_PLAYING] ?: false
+            val albumArtPath = prefs[MusicWidgetKeys.ALBUM_ART_PATH]
             val albumArtBitmap = albumArtPath?.let { BitmapFactory.decodeFile(it) }
-            val blurredArtPath = prefs[VinylWidgetKeys.BLURRED_ART_PATH]
+            val blurredArtPath = prefs[MusicWidgetKeys.BLURRED_ART_PATH]
             val blurredArtBitmap = blurredArtPath?.let { BitmapFactory.decodeFile(it) }
 
             val size = LocalSize.current
@@ -75,6 +75,7 @@ class VinylWidget : GlanceAppWidget() {
         }
     }
 }
+
 @SuppressLint("RestrictedApi")
 
 @Composable
@@ -82,7 +83,7 @@ private fun WideVinylLayout(
     title: String,
     artist: String,
     isPlaying: Boolean,
-    albumArtBitmap: android.graphics.Bitmap?,
+    albumArtBitmap: Bitmap?,
 ) {
     val size = LocalSize.current
     val widgetPadding = 12.dp
@@ -91,7 +92,8 @@ private fun WideVinylLayout(
     val artSize = vinylSize * 0.6f
 
     Row(
-        modifier = GlanceModifier.fillMaxSize().background(ImageProvider(R.drawable.dap_widget_bg)).padding(widgetPadding),
+        modifier = GlanceModifier.fillMaxSize().background(ImageProvider(R.drawable.dap_widget_bg))
+            .padding(widgetPadding),
         verticalAlignment = Alignment.Bottom
     ) {
         Column(
@@ -178,8 +180,8 @@ private fun TallVinylLayout(
     title: String,
     artist: String,
     isPlaying: Boolean,
-    albumArtBitmap: android.graphics.Bitmap?,
-    blurredArtBitmap: android.graphics.Bitmap?,
+    albumArtBitmap: Bitmap?,
+    blurredArtBitmap: Bitmap?,
 ) {
     val size = LocalSize.current
     var vinylSize = 0.dp
