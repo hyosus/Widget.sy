@@ -28,6 +28,16 @@
             android:grantUriPermissions="true">
         </provider>
 
+        <service
+            android:name=".vinylWidget.MediaListenerService"
+            android:exported="true"
+            android:label="Widgetsy Media Listener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <activity
             android:name=".WidgetSettingsActivity"
             android:exported="false"
@@ -69,6 +79,15 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/music_widget_info" />
+        </receiver>
+        <receiver android:name=".vinylWidget.VinylWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/vinyl_widget_info" />
         </receiver>
 
         <activity

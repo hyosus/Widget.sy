@@ -1,5 +1,6 @@
 package com.example.widgetsy
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -7,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,9 +36,11 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.LocalContext
 import androidx.palette.graphics.Palette
 import com.example.widgetsy.musicWidget.SpotifyService
 import com.example.widgetsy.ui.theme.WeatherAppTheme
+import com.example.widgetsy.vinylWidget.MediaListenerService
 
 
 class MainActivity : ComponentActivity() {
@@ -47,14 +51,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        spotifyService = SpotifyService(this)
+//        spotifyService = SpotifyService(this)
 
         setContent {
             WeatherAppTheme {
                 Scaffold()
                 { innerPadding ->
                     Column(modifier = Modifier.padding(innerPadding)) {
-                        CurrentTrackDisplay(spotifyService)
+//                        CurrentTrackDisplay(spotifyService)
                     }
                 }
 
@@ -69,16 +73,30 @@ class MainActivity : ComponentActivity() {
         Log.d("AuthFlow", "Received intent: ${intent.data}") // Log redirect URI
     }
 
+    private fun isNotificationServiceEnabled(): Boolean {
+        val enabledListeners = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+        return enabledListeners?.contains(packageName) == true
+    }
+
     override fun onStart() {
         super.onStart()
         Log.d("MainActivity", "Authorize / connect")
-        spotifyService.authorizeIfNeeded(this)
+//        spotifyService.authorizeIfNeeded(this)
+
+        if (!isNotificationServiceEnabled()) {
+            Log.d("MainActivity", "Notification listener NOT enabled — opening settings")
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        } else if (!MediaListenerService.isConnected) {
+            Log.d("MainActivity", "Permission granted but not connected — requesting rebind")
+            val componentName = ComponentName(this, MediaListenerService::class.java)
+            NotificationListenerService.requestRebind(componentName)
+        }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        spotifyService.handleAuthResponse(requestCode, resultCode, data)
-    }
+//    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+//        super.onActivityResult(requestCode, resultCode, data)
+//        spotifyService.handleAuthResponse(requestCode, resultCode, data)
+//    }
 
     fun requestIgnoreBatteryOptimizations(context: Context) {
         val intent = Intent()
@@ -97,58 +115,41 @@ fun getPrimaryColorFromImage(bitmap: Bitmap): Int {
     return palette.getDominantColor(0) // Default color if no dominant color is found
 }
 
-@Composable
-fun CurrentTrackDisplay(spotifyService: SpotifyService) {
-    val currentTrack by spotifyService.currentTrack
-    var trackImage by remember { mutableStateOf<ImageBitmap?>(null) }
-    var backgroundColor by remember { mutableStateOf(Color.White) }
-
-    LaunchedEffect(currentTrack) {
-        spotifyService.getTrackImage { imageBitmap ->
-            trackImage = imageBitmap
-            imageBitmap?.let {
-                backgroundColor = Color(getPrimaryColorFromImage(it.asAndroidBitmap()))
-                Log.d("MainActivity", "Background color: $backgroundColor")
-            }
-        }
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize().background(backgroundColor).padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center) {
-
-        trackImage?.let {
-            Image(
-                bitmap = it,
-                contentDescription = "Album Image"
-            )
-
-            Log.d("MainActivity", "Image bitmap: $it")
-        }
-        Text(
-            modifier = Modifier.padding(top = 12.dp),
-            text = currentTrack?.name ?: "No track playing",
-            fontWeight = FontWeight.Bold,
-            fontSize = 22.sp)
-        Text(text = currentTrack?.artist?.name ?: "")
-
-//        Row {
-//            Button(onClick = {
-//                spotifyService.skipToPrevious()
-//            }) {
-//                Text(text = "Previous")
-//            }
-//            Button(onClick = {
-//                spotifyService.pause()
-//            }) {
-//                Text(text = "Pause")
-//            }
-//            Button(onClick = {
-//                spotifyService.skipToNext()
-//            }) {
-//                Text(text = "Next")
+//@Composable
+//fun CurrentTrackDisplay(spotifyService: SpotifyService) {
+//    val currentTrack by spotifyService.currentTrack
+//    var trackImage by remember { mutableStateOf<ImageBitmap?>(null) }
+//    var backgroundColor by remember { mutableStateOf(Color.White) }
+//
+//    LaunchedEffect(currentTrack) {
+//        spotifyService.getTrackImage { imageBitmap ->
+//            trackImage = imageBitmap
+//            imageBitmap?.let {
+//                backgroundColor = Color(getPrimaryColorFromImage(it.asAndroidBitmap()))
+//                Log.d("MainActivity", "Background color: $backgroundColor")
 //            }
 //        }
-    }
-}
+//    }
+//
+//    Column(
+//        modifier = Modifier.fillMaxSize().background(backgroundColor).padding(16.dp),
+//        horizontalAlignment = Alignment.CenterHorizontally,
+//        verticalArrangement = Arrangement.Center) {
+//
+//        trackImage?.let {
+//            Image(
+//                bitmap = it,
+//                contentDescription = "Album Image"
+//            )
+//
+//            Log.d("MainActivity", "Image bitmap: $it")
+//        }
+//        Text(
+//            modifier = Modifier.padding(top = 12.dp),
+//            text = currentTrack?.name ?: "No track playing",
+//            fontWeight = FontWeight.Bold,
+//            fontSize = 22.sp)
+//        Text(text = currentTrack?.artist?.name ?: "")
+//
+//    }
+//}
