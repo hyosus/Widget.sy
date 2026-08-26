@@ -2,6 +2,7 @@ package com.example.widgetsy.musicWidget.normal
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
@@ -14,13 +15,15 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionSendBroadcast
+import androidx.glance.appwidget.components.CircleIconButton
 import androidx.glance.appwidget.components.Scaffold
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.background
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -37,6 +40,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.widgetsy.R
+import com.example.widgetsy.musicWidget.MediaControlReceiver
 import com.example.widgetsy.musicWidget.MusicWidgetState
 import com.example.widgetsy.musicWidget.toMusicWidgetState
 
@@ -82,6 +86,7 @@ private fun WidgetLayout(
 ) {
     val size = LocalSize.current
     val height = size.height
+    val context = LocalContext.current
 
     Scaffold(
         modifier = GlanceModifier.fillMaxSize()
@@ -138,47 +143,42 @@ private fun WidgetLayout(
                 Row(
                     modifier = GlanceModifier.fillMaxWidth(),
                 ) {
-                    Text(
-                        text = "Buttons"
+                    CircleIconButton(
+                        imageProvider = ImageProvider(android.R.drawable.ic_media_previous),
+                        contentDescription = "Previous track",
+                        backgroundColor = null,
+                        contentColor = ColorProvider(textColor),
+                        onClick = actionSendBroadcast(
+                            Intent(MediaControlReceiver.ACTION_PREVIOUS)
+                                .setClass(context, MediaControlReceiver::class.java)
+                        )
+                    )
+                    CircleIconButton(
+                        imageProvider = ImageProvider(
+                            if (isPlaying) android.R.drawable.ic_media_pause
+                            else android.R.drawable.ic_media_play
+                        ),
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        backgroundColor = null,
+                        contentColor = ColorProvider(textColor),
+                        onClick = actionSendBroadcast(
+                            Intent(MediaControlReceiver.ACTION_PLAY_PAUSE)
+                                .setClass(context, MediaControlReceiver::class.java)
+                        )
+                    )
+                    CircleIconButton(
+                        imageProvider = ImageProvider(android.R.drawable.ic_media_next),
+                        contentDescription = "Next track",
+                        backgroundColor = null,
+                        contentColor = ColorProvider(textColor),
+                        onClick = actionSendBroadcast(
+                            Intent(MediaControlReceiver.ACTION_NEXT)
+                                .setClass(context, MediaControlReceiver::class.java)
+                        )
                     )
                 }
             }
 
-
-//                Row(
-//                    modifier = GlanceModifier.fillMaxWidth(),
-//
-//                    ) {
-//                            CircleIconButton(
-//                                imageProvider = ImageProvider(drawable.skip_previous),
-//                                backgroundColor = null,
-//                                contentDescription = "",
-//                                contentColor = ColorProvider(textColor),
-//                            )
-//
-//                            if (isPaused) {
-//                                CircleIconButton(
-//                                    imageProvider = ImageProvider(drawable.play_arrow),
-//                                    backgroundColor = null,
-//                                    contentDescription = "",
-//                                    contentColor = ColorProvider(textColor),
-//                                )
-//                            } else {
-//                                CircleIconButton(
-//                                    imageProvider = ImageProvider(drawable.pause),
-//                                    backgroundColor = null,
-//                                    contentDescription = "",
-//                                    contentColor = ColorProvider(textColor)
-//                                )
-//                            }
-//
-//                            CircleIconButton(
-//                                imageProvider = ImageProvider(drawable.skip_next),
-//                                backgroundColor = null,
-//                                contentDescription = "",
-//                                contentColor = ColorProvider(textColor)
-//                            )
-//                }
         }
     }
 }
