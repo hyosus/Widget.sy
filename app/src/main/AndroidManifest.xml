@@ -89,6 +89,16 @@
                 android:resource="@xml/vinyl_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".musicWidget.MediaControlReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.widgetsy.MEDIA_PREVIOUS" />
+                <action android:name="com.example.widgetsy.MEDIA_PLAY_PAUSE" />
+                <action android:name="com.example.widgetsy.MEDIA_NEXT" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -9,7 +9,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
@@ -19,8 +18,8 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.background
-import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -42,6 +41,8 @@ import androidx.glance.unit.ColorProvider
 import com.example.widgetsy.R
 import com.example.widgetsy.musicWidget.MusicWidgetState
 import com.example.widgetsy.musicWidget.toMusicWidgetState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Suppress("RestrictedApi")
 class VinylWidget : GlanceAppWidget() {
@@ -51,16 +52,26 @@ class VinylWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        provideContent {
-            val prefs = currentState<Preferences>()
-            val state = prefs.toMusicWidgetState { path -> BitmapFactory.decodeFile(path) }
+        val prefs = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
+        val state = withContext(Dispatchers.IO) {
+            prefs.toMusicWidgetState { path -> BitmapFactory.decodeFile(path) }
+        }
 
+        provideContent {
             val size = LocalSize.current
             // Tall/roughly-square layout kicks in once height catches up to width
             // (your 3x1/4x1 wide layout has height << width; 2x2 is closer to square/taller)
             val isTallLayout = size.height >= size.width * 0.6f
 
             when (state) {
+                is MusicWidgetState.Loading -> {
+                    if (isTallLayout) {
+                        TallVinylLayout("Loading…", "", null, null)
+                    } else {
+                        WideVinylLayout("Loading…", "", isPlaying = false, albumArtBitmap = null)
+                    }
+                }
+
                 is MusicWidgetState.NoTrack -> {
                     if (isTallLayout) {
                         TallVinylLayout("No track playing", "No artist", null, null)
