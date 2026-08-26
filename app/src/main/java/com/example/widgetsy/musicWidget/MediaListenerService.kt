@@ -21,8 +21,11 @@ import com.example.widgetsy.utils.getTextColor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.time.Duration.Companion.milliseconds
@@ -32,25 +35,24 @@ class MediaListenerService : NotificationListenerService() {
     companion object {
         var instance: MediaListenerService? = null
         var isConnected: Boolean = false
-        private const val TARGET_PACKAGE = "com.hiby.music"
     }
 
-    private val serviceScope = CoroutineScope(Dispatchers.Main)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var activeController: MediaController? = null
 
-    private val controllerCallback = object : MediaController.Callback() {
-        override fun onMetadataChanged(metadata: MediaMetadata?) {
-            refreshFromController()
-        }
+    /** Read-only access for MediaControlReceiver — callers should never mutate this. */
+    val currentController: MediaController?
+        get() = activeController
 
-        override fun onPlaybackStateChanged(state: PlaybackState?) {
-            refreshFromController()
-        }
+    private val controllerCallback = object : MediaController.Callback() {
+        override fun onMetadataChanged(metadata: MediaMetadata?) = refreshFromController()
+        override fun onPlaybackStateChanged(state: PlaybackState?) = refreshFromController()
+        override fun onSessionDestroyed() = onSessions(currentSessions())
     }
 
     private val sessionsChangedListener =
         MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-            attachToBestController(controllers ?: emptyList())
+            onSessions(controllers ?: emptyList())
         }
 
     override fun onListenerConnected() {
@@ -64,7 +66,7 @@ class MediaListenerService : NotificationListenerService() {
 
         try {
             sessionManager.addOnActiveSessionsChangedListener(sessionsChangedListener, componentName)
-            attachToBestController(sessionManager.getActiveSessions(componentName))
+            onSessions(sessionManager.getActiveSessions(componentName))
         } catch (e: SecurityException) {
             Log.e("MediaListener", "Missing permission to get sessions", e)
         }
@@ -73,6 +75,8 @@ class MediaListenerService : NotificationListenerService() {
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         isConnected = false
+        refreshJob?.cancel()
+        refreshJob = null
         activeController?.unregisterCallback(controllerCallback)
         activeController = null
         Log.d("MediaListener", "Listener disconnected")
@@ -84,32 +88,36 @@ class MediaListenerService : NotificationListenerService() {
         isConnected = false
         activeController?.unregisterCallback(controllerCallback)
         activeController = null
+        serviceScope.cancel()
     }
 
+    private fun currentSessions(): List<MediaController> {
+        return try {
+            val sessionManager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val componentName = ComponentName(this, MediaListenerService::class.java)
+            sessionManager.getActiveSessions(componentName)
+        } catch (e: SecurityException) {
+            Log.e("MediaListener", "Missing permission to get sessions", e)
+            emptyList()
+        }
+    }
 
-    private fun attachToBestController(controllers: List<MediaController>) {
-        val hibyController = controllers.firstOrNull {
-            it.packageName == TARGET_PACKAGE && it.playbackState?.state == PlaybackState.STATE_PLAYING
-        }
-        val playingController = controllers.firstOrNull {
-            it.playbackState?.state == PlaybackState.STATE_PLAYING
-        }
-        val targetController = hibyController ?: playingController ?: controllers.firstOrNull()
+    /** Whatever's playing wins, from any app. Falls back to any active session if nothing is. */
+    private fun onSessions(controllers: List<MediaController>) {
+        val target = controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+            ?: controllers.firstOrNull()
 
-        if (targetController?.sessionToken == activeController?.sessionToken) {
-            refreshFromController()
-            return
-        }
+        if (target?.sessionToken == activeController?.sessionToken) return
 
         activeController?.unregisterCallback(controllerCallback)
-        activeController = targetController
+        activeController = target
         activeController?.registerCallback(controllerCallback)
 
-        Log.d("MediaListener", "Now tracking package: ${targetController?.packageName}")
+        Log.d("MediaListener", "Now tracking package: ${target?.packageName}")
         refreshFromController()
     }
 
-    private fun doRefresh() {
+    private suspend fun doRefresh() {
         val controller = activeController
         val metadata = controller?.metadata
 
@@ -119,67 +127,60 @@ class MediaListenerService : NotificationListenerService() {
         val artBitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
 
-        val artPath = artBitmap?.let { saveAlbumArtToFile(it) }
-        val blurredArtPath = artBitmap?.let { saveBitmapToFile(blurBitmap(it, radius = 20), "blurred_art") }
-        val dynamicBgColor = artBitmap?.let { getPrimaryColorFromImage(it) }
-        val dynamicTextColor = dynamicBgColor?.let { getTextColor(Color(it)) }
-
         Log.d("MediaListener", "Updated info: title=$title, artist=$artist, playing=$isPlaying")
-        Log.d("MediaListener", "artBitmap hash=${artBitmap?.let { System.identityHashCode(it) }}, size=${artBitmap?.byteCount}")
 
-        serviceScope.launch {
-            val manager = GlanceAppWidgetManager(applicationContext)
-            val vinylGlanceIds = manager.getGlanceIds(VinylWidget::class.java)
-            val normalGlanceIds = manager.getGlanceIds(MusicWidget::class.java)
+        var artPath: String? = null
+        var blurredArtPath: String? = null
+        var dynamicBgColor: Int? = null
+        var dynamicTextColor: Color? = null
 
-            vinylGlanceIds.forEach { id ->
-                updateAppWidgetState(applicationContext, id) { prefs ->
-                    prefs[MusicWidgetKeys.TITLE] = title
-                    prefs[MusicWidgetKeys.ARTIST] = artist
-                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
-                    if (artPath != null) {
-                        prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
-                    } else {
-                        prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
-                    }
-                    if (blurredArtPath != null) {
-                        prefs[MusicWidgetKeys.BLURRED_ART_PATH] = blurredArtPath
-                    } else {
-                        prefs.remove(MusicWidgetKeys.BLURRED_ART_PATH)
-                    }
-                }
-            }
-
-            normalGlanceIds.forEach { id ->
-                updateAppWidgetState(applicationContext, id) { prefs ->
-                    prefs[MusicWidgetKeys.TITLE] = title
-                    prefs[MusicWidgetKeys.ARTIST] = artist
-                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
-                    if (artPath != null) {
-                        prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
-                    } else {
-                        prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
-                    }
-                    if (dynamicBgColor != null) {
-                        prefs[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR] = dynamicBgColor
-                    } else {
-                        prefs.remove(MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR)
-                    }
-                    prefs[MusicWidgetKeys.DYNAMIC_TEXT_COLOR] = dynamicTextColor?.toArgb() ?: 1
-                }
-            }
-
-            MusicWidget().updateAll(applicationContext)
-            VinylWidget().updateAll(applicationContext)
+        withContext(Dispatchers.IO) {
+            artPath = artBitmap?.let { saveAlbumArtToFile(it) }
+            blurredArtPath = artBitmap?.let { saveBitmapToFile(blurBitmap(it, radius = 20), "blurred_art") }
+            dynamicBgColor = artBitmap?.let { getPrimaryColorFromImage(it) }
+            dynamicTextColor = dynamicBgColor?.let { getTextColor(Color(it)) }
         }
+
+        val manager = GlanceAppWidgetManager(applicationContext)
+
+        manager.getGlanceIds(VinylWidget::class.java).forEach { id ->
+            updateAppWidgetState(applicationContext, id) { prefs ->
+                prefs[MusicWidgetKeys.TITLE] = title
+                prefs[MusicWidgetKeys.ARTIST] = artist
+                prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
+                if (artPath != null) prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
+                else prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
+                if (blurredArtPath != null) prefs[MusicWidgetKeys.BLURRED_ART_PATH] = blurredArtPath
+                else prefs.remove(MusicWidgetKeys.BLURRED_ART_PATH)
+            }
+        }
+
+        manager.getGlanceIds(MusicWidget::class.java).forEach { id ->
+            updateAppWidgetState(applicationContext, id) { prefs ->
+                prefs[MusicWidgetKeys.TITLE] = title
+                prefs[MusicWidgetKeys.ARTIST] = artist
+                prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
+                if (artPath != null) prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
+                else prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
+                if (dynamicBgColor != null) prefs[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR] =
+                    dynamicBgColor
+                else prefs.remove(MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR)
+                prefs[MusicWidgetKeys.DYNAMIC_TEXT_COLOR] = dynamicTextColor?.toArgb() ?: 1
+            }
+        }
+
+        MusicWidget().updateAll(applicationContext)
+        VinylWidget().updateAll(applicationContext)
     }
 
     private var refreshJob: Job? = null
 
+    fun requestRefresh() = refreshFromController()
+
     private fun refreshFromController() {
         refreshJob?.cancel()
         refreshJob = serviceScope.launch {
-            delay(1500.milliseconds) // wait for the burst to settle
+            delay(1500.milliseconds) // let a burst of callbacks settle before doing real work
             doRefresh()
         }
     }
@@ -190,16 +191,13 @@ class MediaListenerService : NotificationListenerService() {
 
     private fun saveBitmapToFile(bitmap: Bitmap, prefix: String): String? {
         return try {
-            val file =
-                File(applicationContext.cacheDir, "${prefix}_${System.currentTimeMillis()}.png")
+            val file = File(applicationContext.cacheDir, "${prefix}_${System.currentTimeMillis()}.png")
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                 out.flush()
             }
-            // Clean up old files with the same prefix so cache doesn't grow forever
             applicationContext.cacheDir.listFiles { f -> f.name.startsWith("${prefix}_") && f.name != file.name }
                 ?.forEach { it.delete() }
-
             file.absolutePath
         } catch (e: Exception) {
             Log.e("MediaListener", "Failed to save $prefix", e)
