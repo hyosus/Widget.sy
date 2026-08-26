@@ -11,14 +11,6 @@ android {
     namespace = "com.example.widgetsy"
     compileSdk = 35
 
-    // Load properties outside buildTypes
-    val keystoreFile = project.rootProject.file("apiKeys.properties")
-    val properties = Properties()
-    properties.load(keystoreFile.inputStream())
-
-    val SPOTIFY_CLIENT_ID = properties.getProperty("SPOTIFY_CLIENT_ID") ?: ""
-    val SPOTIFY_REDIRECT_URI = properties.getProperty("SPOTIFY_REDIRECT_URI") ?: ""
-
     defaultConfig {
         applicationId = "com.example.widgetsy"
         minSdk = 30
@@ -30,19 +22,12 @@ android {
     }
 
     buildTypes {
-        debug {
-            buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"$SPOTIFY_CLIENT_ID\"")
-            buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"$SPOTIFY_REDIRECT_URI\"")
-        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-
-            buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"$SPOTIFY_CLIENT_ID\"")
-            buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"$SPOTIFY_REDIRECT_URI\"")
         }
     }
     compileOptions {
@@ -71,7 +56,6 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(files("../spotify-app-remote-release-0.8.0.aar"))
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -96,9 +80,7 @@ dependencies {
 
     implementation("com.google.code.gson:gson:2.6.1")
 
-    // For spotify music widget
-    implementation("com.spotify.android:auth:1.2.5") // Maven dependency
-    implementation("androidx.browser:browser:1.0.0")
+    // For music widget
     implementation("androidx.appcompat:appcompat:$appcompat_version")
     implementation("io.coil-kt.coil3:coil-compose:3.0.4")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
