@@ -21,8 +21,11 @@ import com.example.widgetsy.utils.getTextColor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.time.Duration.Companion.milliseconds
@@ -32,25 +35,47 @@ class MediaListenerService : NotificationListenerService() {
     companion object {
         var instance: MediaListenerService? = null
         var isConnected: Boolean = false
-        private const val TARGET_PACKAGE = "com.hiby.music"
     }
 
-    private val serviceScope = CoroutineScope(Dispatchers.Main)
-    private var activeController: MediaController? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    internal var activeController: MediaController? = null
 
+    // Every live session we've registered controllerCallback on. Tracking all of them
+    // (not just the active one) is what lets us notice when a *different* app that already
+    // held a session starts playing — that emits onPlaybackStateChanged, not a session-list change.
+    private val registeredControllers = mutableListOf<MediaController>()
+
+    // Identifies the track currently reflected in the widget UI, so a bare play/pause
+    // (same track, no metadata change) can skip the loading/skeleton treatment entirely.
+    private var lastAppliedTrackKey: String? = null
+
+    // Registered on every session, so a state/metadata change from ANY app re-triggers
+    // selection. We can't tell which controller fired, so we just re-read the live session
+    // list and let selectBest() decide — that's cheap and keeps the logic in one place.
     private val controllerCallback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) {
-            refreshFromController()
+            selectBest(currentSessions())
         }
 
         override fun onPlaybackStateChanged(state: PlaybackState?) {
-            refreshFromController()
+            selectBest(currentSessions())
         }
+
+        override fun onSessionDestroyed() {
+            onSessions(currentSessions())
+        }
+    }
+
+    private fun currentTrackKey(): String? {
+        val metadata = activeController?.metadata ?: return null
+        val title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
+        val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+        return "$title|$artist"
     }
 
     private val sessionsChangedListener =
         MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-            attachToBestController(controllers ?: emptyList())
+            onSessions(controllers ?: emptyList())
         }
 
     override fun onListenerConnected() {
@@ -64,7 +89,7 @@ class MediaListenerService : NotificationListenerService() {
 
         try {
             sessionManager.addOnActiveSessionsChangedListener(sessionsChangedListener, componentName)
-            attachToBestController(sessionManager.getActiveSessions(componentName))
+            onSessions(sessionManager.getActiveSessions(componentName))
         } catch (e: SecurityException) {
             Log.e("MediaListener", "Missing permission to get sessions", e)
         }
@@ -73,8 +98,12 @@ class MediaListenerService : NotificationListenerService() {
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         isConnected = false
-        activeController?.unregisterCallback(controllerCallback)
+        refreshJob?.cancel()
+        refreshJob = null
+        registeredControllers.forEach { it.unregisterCallback(controllerCallback) }
+        registeredControllers.clear()
         activeController = null
+        lastAppliedTrackKey = null
         Log.d("MediaListener", "Listener disconnected")
     }
 
@@ -82,34 +111,77 @@ class MediaListenerService : NotificationListenerService() {
         super.onDestroy()
         instance = null
         isConnected = false
-        activeController?.unregisterCallback(controllerCallback)
+        registeredControllers.forEach { it.unregisterCallback(controllerCallback) }
+        registeredControllers.clear()
         activeController = null
+        serviceScope.cancel()
     }
 
 
-    private fun attachToBestController(controllers: List<MediaController>) {
-        val hibyController = controllers.firstOrNull {
-            it.packageName == TARGET_PACKAGE && it.playbackState?.state == PlaybackState.STATE_PLAYING
-        }
-        val playingController = controllers.firstOrNull {
-            it.playbackState?.state == PlaybackState.STATE_PLAYING
-        }
-        val targetController = hibyController ?: playingController ?: controllers.firstOrNull()
+    /** Session set changed (app added/removed): re-register callbacks on all, then re-select. */
+    private fun onSessions(controllers: List<MediaController>) {
+        syncCallbacks(controllers)
+        selectBest(controllers)
+    }
 
-        if (targetController?.sessionToken == activeController?.sessionToken) {
-            refreshFromController()
+    private fun currentSessions(): List<MediaController> {
+        return try {
+            val sessionManager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val componentName = ComponentName(this, MediaListenerService::class.java)
+            sessionManager.getActiveSessions(componentName)
+        } catch (e: SecurityException) {
+            Log.e("MediaListener", "Missing permission to get sessions", e)
+            emptyList()
+        }
+    }
+
+    private fun syncCallbacks(controllers: List<MediaController>) {
+        registeredControllers.forEach { it.unregisterCallback(controllerCallback) }
+        registeredControllers.clear()
+        controllers.forEach {
+            it.registerCallback(controllerCallback)
+            registeredControllers.add(it)
+        }
+    }
+
+    /**
+     * Pick which session drives the widget: whatever is actually playing. The currently
+     * tracked session wins ties while it keeps playing, so two playing apps don't flap.
+     * Falls back to the current (now paused) session, then any session, when nothing plays.
+     */
+    private fun selectBest(controllers: List<MediaController>) {
+        val currentToken = activeController?.sessionToken
+        val currentStillPlaying = controllers.any {
+            it.sessionToken == currentToken && it.playbackState?.state == PlaybackState.STATE_PLAYING
+        }
+
+        val target = when {
+            currentStillPlaying -> controllers.first { it.sessionToken == currentToken }
+            else -> controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+                ?: controllers.firstOrNull { it.sessionToken == currentToken }
+                ?: controllers.firstOrNull()
+        }
+
+        if (target?.sessionToken == currentToken) {
+            // Same session we already track — refresh the handle and update in place.
+            activeController = target
+            val state = target?.playbackState?.state
+            when {
+                target == null -> return
+                currentTrackKey() != lastAppliedTrackKey -> refreshFromController()
+                state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_PAUSED ->
+                    updatePlaybackStateOnly(state == PlaybackState.STATE_PLAYING)
+            }
             return
         }
 
-        activeController?.unregisterCallback(controllerCallback)
-        activeController = targetController
-        activeController?.registerCallback(controllerCallback)
-
-        Log.d("MediaListener", "Now tracking package: ${targetController?.packageName}")
+        // Switching to a different session.
+        activeController = target
+        Log.d("MediaListener", "Now tracking package: ${target?.packageName}")
         refreshFromController()
     }
 
-    private fun doRefresh() {
+    private suspend fun doRefresh() {
         val controller = activeController
         val metadata = controller?.metadata
 
@@ -119,56 +191,83 @@ class MediaListenerService : NotificationListenerService() {
         val artBitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
 
-        val artPath = artBitmap?.let { saveAlbumArtToFile(it) }
-        val blurredArtPath = artBitmap?.let { saveBitmapToFile(blurBitmap(it, radius = 20), "blurred_art") }
-        val dynamicBgColor = artBitmap?.let { getPrimaryColorFromImage(it) }
-        val dynamicTextColor = dynamicBgColor?.let { getTextColor(Color(it)) }
+        lastAppliedTrackKey = "$title|$artist"
 
         Log.d("MediaListener", "Updated info: title=$title, artist=$artist, playing=$isPlaying")
         Log.d("MediaListener", "artBitmap hash=${artBitmap?.let { System.identityHashCode(it) }}, size=${artBitmap?.byteCount}")
 
+        var artPath: String? = null
+        var blurredArtPath: String? = null
+        var dynamicBgColor: Int? = null
+        var dynamicTextColor: Color? = null
+
+        withContext(Dispatchers.IO) {
+            artPath = artBitmap?.let { saveAlbumArtToFile(it) }
+            blurredArtPath = artBitmap?.let { saveBitmapToFile(blurBitmap(it, radius = 20), "blurred_art") }
+            dynamicBgColor = artBitmap?.let { getPrimaryColorFromImage(it) }
+            dynamicTextColor = dynamicBgColor?.let { getTextColor(Color(it)) }
+        }
+
+        val manager = GlanceAppWidgetManager(applicationContext)
+        val vinylGlanceIds = manager.getGlanceIds(VinylWidget::class.java)
+        val normalGlanceIds = manager.getGlanceIds(MusicWidget::class.java)
+
+        vinylGlanceIds.forEach { id ->
+            updateAppWidgetState(applicationContext, id) { prefs ->
+                prefs[MusicWidgetKeys.TITLE] = title
+                prefs[MusicWidgetKeys.ARTIST] = artist
+                prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
+                prefs[MusicWidgetKeys.IS_LOADING] = false
+                if (artPath != null) {
+                    prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
+                } else {
+                    prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
+                }
+                if (blurredArtPath != null) {
+                    prefs[MusicWidgetKeys.BLURRED_ART_PATH] = blurredArtPath
+                } else {
+                    prefs.remove(MusicWidgetKeys.BLURRED_ART_PATH)
+                }
+            }
+        }
+
+        normalGlanceIds.forEach { id ->
+            updateAppWidgetState(applicationContext, id) { prefs ->
+                prefs[MusicWidgetKeys.TITLE] = title
+                prefs[MusicWidgetKeys.ARTIST] = artist
+                prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
+                prefs[MusicWidgetKeys.IS_LOADING] = false
+                if (artPath != null) {
+                    prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
+                } else {
+                    prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
+                }
+                if (dynamicBgColor != null) {
+                    prefs[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR] = dynamicBgColor
+                } else {
+                    prefs.remove(MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR)
+                }
+                prefs[MusicWidgetKeys.DYNAMIC_TEXT_COLOR] = dynamicTextColor?.toArgb() ?: 1
+            }
+        }
+
+        MusicWidget().updateAll(applicationContext)
+        VinylWidget().updateAll(applicationContext)
+    }
+
+    private fun updatePlaybackStateOnly(isPlaying: Boolean) {
         serviceScope.launch {
             val manager = GlanceAppWidgetManager(applicationContext)
-            val vinylGlanceIds = manager.getGlanceIds(VinylWidget::class.java)
-            val normalGlanceIds = manager.getGlanceIds(MusicWidget::class.java)
-
-            vinylGlanceIds.forEach { id ->
+            manager.getGlanceIds(VinylWidget::class.java).forEach { id ->
                 updateAppWidgetState(applicationContext, id) { prefs ->
-                    prefs[MusicWidgetKeys.TITLE] = title
-                    prefs[MusicWidgetKeys.ARTIST] = artist
                     prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
-                    if (artPath != null) {
-                        prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
-                    } else {
-                        prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
-                    }
-                    if (blurredArtPath != null) {
-                        prefs[MusicWidgetKeys.BLURRED_ART_PATH] = blurredArtPath
-                    } else {
-                        prefs.remove(MusicWidgetKeys.BLURRED_ART_PATH)
-                    }
                 }
             }
-
-            normalGlanceIds.forEach { id ->
+            manager.getGlanceIds(MusicWidget::class.java).forEach { id ->
                 updateAppWidgetState(applicationContext, id) { prefs ->
-                    prefs[MusicWidgetKeys.TITLE] = title
-                    prefs[MusicWidgetKeys.ARTIST] = artist
                     prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
-                    if (artPath != null) {
-                        prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
-                    } else {
-                        prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
-                    }
-                    if (dynamicBgColor != null) {
-                        prefs[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR] = dynamicBgColor
-                    } else {
-                        prefs.remove(MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR)
-                    }
-                    prefs[MusicWidgetKeys.DYNAMIC_TEXT_COLOR] = dynamicTextColor?.toArgb() ?: 1
                 }
             }
-
             MusicWidget().updateAll(applicationContext)
             VinylWidget().updateAll(applicationContext)
         }
@@ -176,12 +275,33 @@ class MediaListenerService : NotificationListenerService() {
 
     private var refreshJob: Job? = null
 
+    fun requestRefresh() {
+        refreshFromController()
+    }
+
     private fun refreshFromController() {
         refreshJob?.cancel()
         refreshJob = serviceScope.launch {
+            setLoadingState(true)
             delay(1500.milliseconds) // wait for the burst to settle
             doRefresh()
         }
+    }
+
+    private suspend fun setLoadingState(isLoading: Boolean) {
+        val manager = GlanceAppWidgetManager(applicationContext)
+        manager.getGlanceIds(VinylWidget::class.java).forEach { id ->
+            updateAppWidgetState(applicationContext, id) { prefs ->
+                prefs[MusicWidgetKeys.IS_LOADING] = isLoading
+            }
+        }
+        manager.getGlanceIds(MusicWidget::class.java).forEach { id ->
+            updateAppWidgetState(applicationContext, id) { prefs ->
+                prefs[MusicWidgetKeys.IS_LOADING] = isLoading
+            }
+        }
+        MusicWidget().updateAll(applicationContext)
+        VinylWidget().updateAll(applicationContext)
     }
 
     // Bitmaps can't be stored in Preferences directly — write to a file, store the path.
