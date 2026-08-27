@@ -219,7 +219,7 @@ class MediaListenerService : NotificationListenerService() {
     private fun refreshFromController() {
         refreshJob?.cancel()
         refreshJob = serviceScope.launch {
-            delay(1500.milliseconds) // let a burst of callbacks settle before doing real work
+            delay(300.milliseconds) // let a burst of callbacks settle before doing real work
             doRefresh()
         }
     }
