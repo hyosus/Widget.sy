@@ -46,7 +46,7 @@ class MediaListenerService : NotificationListenerService() {
 
     private val controllerCallback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) = refreshFromController()
-        override fun onPlaybackStateChanged(state: PlaybackState?) = refreshFromController()
+        override fun onPlaybackStateChanged(state: PlaybackState?) = fastRefreshPlaybackState()
         override fun onSessionDestroyed() = onSessions(currentSessions())
     }
 
@@ -194,6 +194,27 @@ class MediaListenerService : NotificationListenerService() {
     private var refreshJob: Job? = null
 
     fun requestRefresh() = refreshFromController()
+
+    private fun fastRefreshPlaybackState() {
+        val isPlaying = activeController?.playbackState?.state == PlaybackState.STATE_PLAYING
+        serviceScope.launch {
+            val manager = GlanceAppWidgetManager(applicationContext)
+            val vinylGlanceIds = manager.getGlanceIds(VinylWidget::class.java)
+            val normalGlanceIds = manager.getGlanceIds(MusicWidget::class.java)
+            vinylGlanceIds.forEach { id ->
+                updateAppWidgetState(applicationContext, id) { prefs ->
+                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
+                }
+            }
+            normalGlanceIds.forEach { id ->
+                updateAppWidgetState(applicationContext, id) { prefs ->
+                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
+                }
+            }
+            MusicWidget().updateAll(applicationContext)
+            VinylWidget().updateAll(applicationContext)
+        }
+    }
 
     private fun refreshFromController() {
         refreshJob?.cancel()
