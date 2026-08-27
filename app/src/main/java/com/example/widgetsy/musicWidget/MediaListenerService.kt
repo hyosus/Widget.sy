@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.time.Duration.Companion.milliseconds
+import androidx.core.graphics.get
 
 class MediaListenerService : NotificationListenerService() {
 
@@ -47,24 +48,30 @@ class MediaListenerService : NotificationListenerService() {
 
     private var lastMetadataKey: String? = null
     private var lastPlaybackState: Int? = null
-    private var hasArtForCurrentTrack: Boolean = false
+    private var lastArtFingerprint: String? = null
 
     private val controllerCallback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) {
             val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
             val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
             val key = "$title|$artist"
-            val hasArt = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) != null
-                    || metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART) != null
-            Log.d("MediaListener", "onMetadataChanged: title=$title, artist=$artist (lastKey=$lastMetadataKey, newKey=$key, hasArt=$hasArt, hadArt=$hasArtForCurrentTrack)")
-            if (key == lastMetadataKey && (hasArtForCurrentTrack || !hasArt)) {
-                Log.d("MediaListener", "onMetadataChanged: same track, no new art, skipping")
+            val artBitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+            val artFingerprint = artBitmap?.let { bmp ->
+                val w = bmp.width
+                val h = bmp.height
+                "${w}x${h}_${bmp[w / 4, h / 4].toUInt().toString(16)}_${bmp[w * 3 / 4, h * 3 / 4].toUInt().toString(16)}"
+            }
+            Log.d("MediaListener", "onMetadataChanged: title=$title, artist=$artist (lastKey=$lastMetadataKey, newKey=$key, artFp=$artFingerprint, lastArtFp=$lastArtFingerprint)")
+            if (key == lastMetadataKey && artFingerprint == lastArtFingerprint) {
+                Log.d("MediaListener", "onMetadataChanged: same track and art unchanged, skipping")
                 return
             }
             if (key != lastMetadataKey) {
-                hasArtForCurrentTrack = false
+                lastArtFingerprint = null
             }
             lastMetadataKey = key
+            lastArtFingerprint = artFingerprint
             scheduleRefresh()
         }
         override fun onPlaybackStateChanged(state: PlaybackState?) {
@@ -143,7 +150,7 @@ class MediaListenerService : NotificationListenerService() {
         activeController?.registerCallback(controllerCallback)
         lastMetadataKey = null
         lastPlaybackState = null
-        hasArtForCurrentTrack = false
+        lastArtFingerprint = null
 
         Log.d("MediaListener", "Now tracking package: ${target?.packageName}")
         scheduleRefresh()
@@ -198,7 +205,6 @@ class MediaListenerService : NotificationListenerService() {
             return
         }
 
-        hasArtForCurrentTrack = true
         Log.d("MediaListener", "doRefresh: has art, entering loading skeleton")
         coroutineScope {
             // Kick off heavy IO immediately — runs concurrently with the loading-state write below.
