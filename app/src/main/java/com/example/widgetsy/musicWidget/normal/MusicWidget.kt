@@ -34,8 +34,10 @@ import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -43,6 +45,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.widgetsy.R
 import com.example.widgetsy.musicWidget.MediaControlReceiver
+import com.example.widgetsy.musicWidget.MusicWidgetKeys
 import com.example.widgetsy.musicWidget.MusicWidgetState
 import com.example.widgetsy.musicWidget.toMusicWidgetState
 
@@ -61,6 +64,10 @@ class MusicWidget: GlanceAppWidget() {
 
 
             when (state) {
+                is MusicWidgetState.Loading -> {
+                    LoadingSkeletonLayout(bgColor = prefs[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR])
+                }
+
                 is MusicWidgetState.NoTrack -> {
                     Log.d("MusicWidget", "FUCK")
                     WidgetLayout("No track playing", "No artist", false, null, Color.Black, null)
@@ -70,6 +77,65 @@ class MusicWidget: GlanceAppWidget() {
                     Log.d("MusicWidget", "BGCOLOR argbColor: ${state.dynamicBgColor}")
                     Log.d("MusicWidget", "Track: ${state.title}, Artist: ${state.artist}, Album Art: ${state.albumArt}, Is Paused: ${state.isPlaying}")
                     state.dynamicTextColor?.let { WidgetLayout(state.title, state.artist, state.isPlaying, state.albumArt, Color(it), state.dynamicBgColor) }
+                }
+            }
+        }
+    }
+}
+
+@SuppressLint("RestrictedApi")
+@Composable
+private fun LoadingSkeletonLayout(bgColor: Int?) {
+    val height = LocalSize.current.height
+    val skeletonColor = if (bgColor != null) Color.White.copy(alpha = 0.35f) else Color(0xFFBDBDBD)
+
+    Scaffold(
+        modifier = GlanceModifier.fillMaxSize().padding(vertical = 12.dp),
+        backgroundColor = if (bgColor != null) ColorProvider(Color(bgColor)) else ColorProvider(Color.White)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = GlanceModifier
+                    .size(height * 0.75f)
+                    .cornerRadius(12.dp)
+                    .background(skeletonColor)
+            ) {}
+
+            Spacer(modifier = GlanceModifier.size(12.dp))
+
+            Column(
+                modifier = GlanceModifier.fillMaxSize(),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Column(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Box(
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .height(18.dp)
+                            .cornerRadius(4.dp)
+                            .background(skeletonColor)
+                    ) {}
+                    Spacer(modifier = GlanceModifier.size(8.dp))
+                    Box(
+                        modifier = GlanceModifier
+                            .width(100.dp)
+                            .height(14.dp)
+                            .cornerRadius(4.dp)
+                            .background(skeletonColor)
+                    ) {}
+                }
+
+                Box(modifier = GlanceModifier.defaultWeight()) {}
+
+                Row(modifier = GlanceModifier.fillMaxWidth()) {
+                    Box(modifier = GlanceModifier.size(26.dp).cornerRadius(13.dp).background(skeletonColor)) {}
+                    Spacer(modifier = GlanceModifier.size(24.dp))
+                    Box(modifier = GlanceModifier.size(26.dp).cornerRadius(13.dp).background(skeletonColor)) {}
+                    Spacer(modifier = GlanceModifier.size(24.dp))
+                    Box(modifier = GlanceModifier.size(26.dp).cornerRadius(13.dp).background(skeletonColor)) {}
                 }
             }
         }

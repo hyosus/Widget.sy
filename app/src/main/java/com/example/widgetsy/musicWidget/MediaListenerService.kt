@@ -22,10 +22,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.time.Duration.Companion.milliseconds
@@ -44,9 +45,35 @@ class MediaListenerService : NotificationListenerService() {
     val currentController: MediaController?
         get() = activeController
 
+    private var lastMetadataKey: String? = null
+    private var lastPlaybackState: Int? = null
+    private var hasArtForCurrentTrack: Boolean = false
+
     private val controllerCallback = object : MediaController.Callback() {
-        override fun onMetadataChanged(metadata: MediaMetadata?) = refreshFromController()
-        override fun onPlaybackStateChanged(state: PlaybackState?) = fastRefreshPlaybackState()
+        override fun onMetadataChanged(metadata: MediaMetadata?) {
+            val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
+            val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+            val key = "$title|$artist"
+            val hasArt = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) != null
+                    || metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART) != null
+            Log.d("MediaListener", "onMetadataChanged: title=$title, artist=$artist (lastKey=$lastMetadataKey, newKey=$key, hasArt=$hasArt, hadArt=$hasArtForCurrentTrack)")
+            if (key == lastMetadataKey && (hasArtForCurrentTrack || !hasArt)) {
+                Log.d("MediaListener", "onMetadataChanged: same track, no new art, skipping")
+                return
+            }
+            if (key != lastMetadataKey) {
+                hasArtForCurrentTrack = false
+            }
+            lastMetadataKey = key
+            scheduleRefresh()
+        }
+        override fun onPlaybackStateChanged(state: PlaybackState?) {
+            val stateCode = state?.state
+            Log.d("MediaListener", "onPlaybackStateChanged: state=$stateCode (PLAYING=${PlaybackState.STATE_PLAYING}, PAUSED=${PlaybackState.STATE_PAUSED})")
+            if (stateCode == lastPlaybackState) return
+            lastPlaybackState = stateCode
+            schedulePlaybackRefresh()
+        }
         override fun onSessionDestroyed() = onSessions(currentSessions())
     }
 
@@ -77,6 +104,8 @@ class MediaListenerService : NotificationListenerService() {
         isConnected = false
         refreshJob?.cancel()
         refreshJob = null
+        playbackRefreshJob?.cancel()
+        playbackRefreshJob = null
         activeController?.unregisterCallback(controllerCallback)
         activeController = null
         Log.d("MediaListener", "Listener disconnected")
@@ -112,10 +141,20 @@ class MediaListenerService : NotificationListenerService() {
         activeController?.unregisterCallback(controllerCallback)
         activeController = target
         activeController?.registerCallback(controllerCallback)
+        lastMetadataKey = null
+        lastPlaybackState = null
+        hasArtForCurrentTrack = false
 
         Log.d("MediaListener", "Now tracking package: ${target?.packageName}")
-        refreshFromController()
+        scheduleRefresh()
     }
+
+    private data class ArtResult(
+        val artPath: String?,
+        val blurredArtPath: String?,
+        val dynamicBgColor: Int?,
+        val dynamicTextColor: Color?
+    )
 
     private suspend fun doRefresh() {
         val controller = activeController
@@ -127,77 +166,109 @@ class MediaListenerService : NotificationListenerService() {
         val artBitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
 
-//        lastAppliedTrackKey = "$title|$artist"
-
-        Log.d("MediaListener", "Updated info: title=$title, artist=$artist, playing=$isPlaying")
-        Log.d("MediaListener", "artBitmap hash=${artBitmap?.let { System.identityHashCode(it) }}, size=${artBitmap?.byteCount}")
-
-        var artPath: String? = null
-        var blurredArtPath: String? = null
-        var dynamicBgColor: Int? = null
-        var dynamicTextColor: Color? = null
-
-        withContext(Dispatchers.IO) {
-            artPath = artBitmap?.let { saveAlbumArtToFile(it) }
-            blurredArtPath = artBitmap?.let { saveBitmapToFile(blurBitmap(it, radius = 20), "blurred_art") }
-            dynamicBgColor = artBitmap?.let { getPrimaryColorFromImage(it) }
-            dynamicTextColor = dynamicBgColor?.let { getTextColor(Color(it)) }
-        }
+        Log.d("MediaListener", "doRefresh: title=$title, artist=$artist, playing=$isPlaying, hasArt=${artBitmap != null}")
 
         val manager = GlanceAppWidgetManager(applicationContext)
         val vinylGlanceIds = manager.getGlanceIds(VinylWidget::class.java)
         val normalGlanceIds = manager.getGlanceIds(MusicWidget::class.java)
 
-        vinylGlanceIds.forEach { id ->
-            updateAppWidgetState(applicationContext, id) { prefs ->
-                prefs[MusicWidgetKeys.TITLE] = title
-                prefs[MusicWidgetKeys.ARTIST] = artist
-                prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
-//                prefs[MusicWidgetKeys.IS_LOADING] = false
-                if (artPath != null) {
-                    prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
-                } else {
+        if (artBitmap == null) {
+            Log.d("MediaListener", "doRefresh: no art, clearing stale art and updating text")
+            vinylGlanceIds.forEach { id ->
+                updateAppWidgetState(applicationContext, id) { prefs ->
+                    prefs[MusicWidgetKeys.TITLE] = title
+                    prefs[MusicWidgetKeys.ARTIST] = artist
+                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
                     prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
-                }
-                if (blurredArtPath != null) {
-                    prefs[MusicWidgetKeys.BLURRED_ART_PATH] = blurredArtPath
-                } else {
                     prefs.remove(MusicWidgetKeys.BLURRED_ART_PATH)
                 }
             }
-        }
-
-        normalGlanceIds.forEach { id ->
-            updateAppWidgetState(applicationContext, id) { prefs ->
-                prefs[MusicWidgetKeys.TITLE] = title
-                prefs[MusicWidgetKeys.ARTIST] = artist
-                prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
-//                prefs[MusicWidgetKeys.IS_LOADING] = false
-                if (artPath != null) {
-                    prefs[MusicWidgetKeys.ALBUM_ART_PATH] = artPath
-                } else {
+            normalGlanceIds.forEach { id ->
+                updateAppWidgetState(applicationContext, id) { prefs ->
+                    prefs[MusicWidgetKeys.TITLE] = title
+                    prefs[MusicWidgetKeys.ARTIST] = artist
+                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlaying
                     prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
-                }
-                if (dynamicBgColor != null) {
-                    prefs[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR] = dynamicBgColor
-                } else {
                     prefs.remove(MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR)
+                    prefs.remove(MusicWidgetKeys.DYNAMIC_TEXT_COLOR)
                 }
-                prefs[MusicWidgetKeys.DYNAMIC_TEXT_COLOR] = dynamicTextColor?.toArgb() ?: 1
             }
+            MusicWidget().updateAll(applicationContext)
+            VinylWidget().updateAll(applicationContext)
+            return
         }
 
-        MusicWidget().updateAll(applicationContext)
-        VinylWidget().updateAll(applicationContext)
+        hasArtForCurrentTrack = true
+        Log.d("MediaListener", "doRefresh: has art, entering loading skeleton")
+        coroutineScope {
+            // Kick off heavy IO immediately — runs concurrently with the loading-state write below.
+            val artDeferred = async(Dispatchers.IO) {
+                val artPath = saveAlbumArtToFile(artBitmap)
+                val blurredArtPath = saveBitmapToFile(blurBitmap(artBitmap, radius = 20), "blurred_art")
+                val dynamicBgColor = getPrimaryColorFromImage(artBitmap)
+                val dynamicTextColor = getTextColor(Color(dynamicBgColor))
+                ArtResult(artPath, blurredArtPath, dynamicBgColor, dynamicTextColor)
+            }
+
+            // Show skeleton while IO is in flight. Title/artist intentionally stay stale so
+            // the skeleton is the only thing visible — no text flash mid-transition.
+            vinylGlanceIds.forEach { id ->
+                updateAppWidgetState(applicationContext, id) { prefs ->
+                    prefs[MusicWidgetKeys.IS_LOADING] = true
+                }
+            }
+            normalGlanceIds.forEach { id ->
+                updateAppWidgetState(applicationContext, id) { prefs ->
+                    prefs[MusicWidgetKeys.IS_LOADING] = true
+                }
+            }
+            MusicWidget().updateAll(applicationContext)
+            VinylWidget().updateAll(applicationContext)
+
+            // Wait for IO, then write all final state together at once so the widget
+            // transitions from skeleton to complete UI in a single update.
+            val art = artDeferred.await()
+            val isPlayingNow = activeController?.playbackState?.state == PlaybackState.STATE_PLAYING
+
+            vinylGlanceIds.forEach { id ->
+                updateAppWidgetState(applicationContext, id) { prefs ->
+                    prefs[MusicWidgetKeys.IS_LOADING] = false
+                    prefs[MusicWidgetKeys.TITLE] = title
+                    prefs[MusicWidgetKeys.ARTIST] = artist
+                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlayingNow
+                    if (art.artPath != null) prefs[MusicWidgetKeys.ALBUM_ART_PATH] = art.artPath
+                    else prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
+                    if (art.blurredArtPath != null) prefs[MusicWidgetKeys.BLURRED_ART_PATH] = art.blurredArtPath
+                    else prefs.remove(MusicWidgetKeys.BLURRED_ART_PATH)
+                }
+            }
+            normalGlanceIds.forEach { id ->
+                updateAppWidgetState(applicationContext, id) { prefs ->
+                    prefs[MusicWidgetKeys.IS_LOADING] = false
+                    prefs[MusicWidgetKeys.TITLE] = title
+                    prefs[MusicWidgetKeys.ARTIST] = artist
+                    prefs[MusicWidgetKeys.IS_PLAYING] = isPlayingNow
+                    if (art.artPath != null) prefs[MusicWidgetKeys.ALBUM_ART_PATH] = art.artPath
+                    else prefs.remove(MusicWidgetKeys.ALBUM_ART_PATH)
+                    if (art.dynamicBgColor != null) prefs[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR] = art.dynamicBgColor
+                    else prefs.remove(MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR)
+                    prefs[MusicWidgetKeys.DYNAMIC_TEXT_COLOR] = art.dynamicTextColor?.toArgb() ?: 1
+                }
+            }
+            MusicWidget().updateAll(applicationContext)
+            VinylWidget().updateAll(applicationContext)
+        }
     }
 
     private var refreshJob: Job? = null
+    private var playbackRefreshJob: Job? = null
 
-    fun requestRefresh() = refreshFromController()
-
-    private fun fastRefreshPlaybackState() {
-        val isPlaying = activeController?.playbackState?.state == PlaybackState.STATE_PLAYING
-        serviceScope.launch {
+    private fun schedulePlaybackRefresh() {
+        if (refreshJob?.isActive == true) return
+        playbackRefreshJob?.cancel()
+        playbackRefreshJob = serviceScope.launch {
+            delay(150.milliseconds)
+            val isPlaying = activeController?.playbackState?.state == PlaybackState.STATE_PLAYING
             val manager = GlanceAppWidgetManager(applicationContext)
             val vinylGlanceIds = manager.getGlanceIds(VinylWidget::class.java)
             val normalGlanceIds = manager.getGlanceIds(MusicWidget::class.java)
@@ -216,10 +287,11 @@ class MediaListenerService : NotificationListenerService() {
         }
     }
 
-    private fun refreshFromController() {
+    private fun scheduleRefresh() {
         refreshJob?.cancel()
+        playbackRefreshJob?.cancel()
         refreshJob = serviceScope.launch {
-            delay(300.milliseconds) // let a burst of callbacks settle before doing real work
+            delay(300.milliseconds)
             doRefresh()
         }
     }

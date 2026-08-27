@@ -61,6 +61,14 @@ class VinylWidget : GlanceAppWidget() {
             val isTallLayout = size.height >= size.width * 0.6f
 
             when (state) {
+                is MusicWidgetState.Loading -> {
+                    if (isTallLayout) {
+                        SkeletonTallVinylLayout()
+                    } else {
+                        SkeletonWideVinylLayout()
+                    }
+                }
+
                 is MusicWidgetState.NoTrack -> {
                     if (isTallLayout) {
                         TallVinylLayout("No track playing", "No artist", null, null)
@@ -180,6 +188,90 @@ private fun WideVinylLayout(
     }
 }
 
+@Composable
+private fun SkeletonWideVinylLayout() {
+    val size = LocalSize.current
+    val widgetPadding = 12.dp
+    val vinylBoxWidth = (size.height - widgetPadding)
+    val vinylSize = vinylBoxWidth * 0.9f
+    val artSize = vinylSize * 0.6f
+
+    val skeletonColor = Color(0xFFBDBDBD)
+
+    Row(
+        modifier = GlanceModifier.fillMaxSize().background(ImageProvider(R.drawable.dap_widget_bg))
+            .padding(widgetPadding),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        Column(
+            modifier = GlanceModifier.fillMaxSize().defaultWeight(),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Column(
+                modifier = GlanceModifier.defaultWeight(),
+                verticalAlignment = Alignment.Top
+            ) {
+                Box(
+                    modifier = GlanceModifier
+                        .width(50.dp)
+                        .height(14.dp)
+                        .cornerRadius(4.dp)
+                        .background(skeletonColor)
+                ) {}
+
+                Box(modifier = GlanceModifier.defaultWeight()) {} // spacer pushes the rest down
+
+                Box(
+                    modifier = GlanceModifier
+                        .width(100.dp)
+                        .height(14.dp)
+                        .cornerRadius(4.dp)
+                        .background(skeletonColor)
+                ) {}
+
+                Box(
+                    modifier = GlanceModifier
+                        .width(140.dp)
+                        .height(14.dp)
+                        .cornerRadius(4.dp)
+                        .background(skeletonColor)
+                ) {}
+            }
+        }
+
+        Box(
+            modifier = GlanceModifier.width(vinylBoxWidth).fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = GlanceModifier.padding(end = 5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    modifier = GlanceModifier.size(vinylSize).cornerRadius(180.dp),
+                    provider = ImageProvider(R.drawable.vinyl),
+                    contentDescription = "Vinyl Background"
+                )
+                Image(
+                    modifier = GlanceModifier.size(artSize).cornerRadius(80.dp),
+                    provider = ImageProvider(R.drawable.cloud_widget_bg),
+                    contentDescription = "Album Art"
+                )
+            }
+            Box(
+                modifier = GlanceModifier.padding(start = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    modifier = GlanceModifier.size(vinylSize),
+                    provider = ImageProvider(R.drawable.turntable_arm),
+                    contentDescription = "Foreground"
+                )
+            }
+
+        }
+    }
+}
 @SuppressLint("RestrictedApi")
 @Composable
 private fun TallVinylLayout(
@@ -286,6 +378,101 @@ private fun TallVinylLayout(
                         textAlign = TextAlign.Center
                     )
                 )
+            }
+
+
+        }
+    }
+}
+
+@Composable
+private fun SkeletonTallVinylLayout() {
+    val size = LocalSize.current
+    var vinylSize: Dp
+    var vinylBoxSize: Dp
+    var artSize: Dp
+    var vinylBg: Dp
+
+    val skeletonColor = Color(0xFFBDBDBD)
+
+    if (size.width > size.height) {
+        vinylSize = size.height
+        vinylBoxSize = vinylSize * 0.7f
+        vinylBg = vinylBoxSize
+        artSize = vinylSize * 0.45f
+    } else {
+        vinylSize = size.width
+        vinylBoxSize = vinylSize * 0.8f
+        vinylBg = vinylBoxSize * 0.9f
+        artSize = vinylBg * 0.6f
+    }
+
+    Box(modifier = GlanceModifier.fillMaxSize()) {
+        Image(
+            modifier = GlanceModifier.fillMaxSize(),
+            provider = ImageProvider(R.drawable.dap_widget_bg),
+            contentScale = ContentScale.Crop,
+            contentDescription = null
+        )
+
+        // Layer 2: dark scrim so white text stays readable over bright/busy art
+        Box(
+            modifier = GlanceModifier.fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.70f))
+        ) {}
+
+        // Layer 3: actual content
+        Column(
+            modifier = GlanceModifier.fillMaxSize().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Vinyl + album art, centered, taking most of the vertical space
+            Box(
+                modifier = GlanceModifier.defaultWeight().height(vinylBoxSize).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    modifier = GlanceModifier.size(vinylBg),
+                    provider = ImageProvider(R.drawable.vinyl),
+                    contentDescription = "Vinyl Background"
+                )
+                Image(
+                    modifier = GlanceModifier.size(artSize).cornerRadius(95.dp),
+                    provider = ImageProvider(R.drawable.cloud_widget_bg),
+                    contentDescription = "Album Art"
+                )
+
+                Box(
+                    modifier = GlanceModifier.padding(start = vinylSize * 0.15f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        modifier = GlanceModifier.size(vinylSize * 0.7f),
+                        provider = ImageProvider(R.drawable.turntable_arm),
+                        contentDescription = "Foreground"
+                    )
+                }
+            }
+
+            Column(
+                modifier = GlanceModifier.defaultWeight(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = GlanceModifier
+                        .width(140.dp)
+                        .height(14.dp)
+                        .cornerRadius(4.dp)
+                        .background(skeletonColor)
+                ) {}
+                Box(
+                    modifier = GlanceModifier
+                        .width(100.dp)
+                        .height(14.dp)
+                        .cornerRadius(4.dp)
+                        .background(skeletonColor)
+                ) {}
             }
 
 
