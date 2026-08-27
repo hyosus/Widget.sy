@@ -20,10 +20,12 @@ import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionSendBroadcast
-import androidx.glance.appwidget.components.CircleIconButton
+import androidx.glance.ColorFilter
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.components.Scaffold
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.background
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -61,7 +63,7 @@ class MusicWidget: GlanceAppWidget() {
             when (state) {
                 is MusicWidgetState.NoTrack -> {
                     Log.d("MusicWidget", "FUCK")
-                    WidgetLayout("No track playing", "No artist", false, null, Color.Black, 0)
+                    WidgetLayout("No track playing", "No artist", false, null, Color.Black, null)
                 }
 
                 is MusicWidgetState.Completed -> {
@@ -120,6 +122,7 @@ private fun WidgetLayout(
                     verticalAlignment = Alignment.Top
                 ) {
                     Text(
+                        modifier = GlanceModifier.fillMaxWidth(),
                         text = title,
                         style = TextStyle(
                             color = ColorProvider(textColor),
@@ -143,38 +146,40 @@ private fun WidgetLayout(
                 Row(
                     modifier = GlanceModifier.fillMaxWidth(),
                 ) {
-                    CircleIconButton(
-                        imageProvider = ImageProvider(android.R.drawable.ic_media_previous),
+                    Image(
+                        modifier = GlanceModifier.size(26.dp)
+                            .clickable(actionSendBroadcast(
+                                Intent(MediaControlReceiver.ACTION_PREVIOUS)
+                                    .setClass(context, MediaControlReceiver::class.java)
+                            )),
+                        provider = ImageProvider(android.R.drawable.ic_media_previous),
                         contentDescription = "Previous track",
-                        backgroundColor = null,
-                        contentColor = ColorProvider(textColor),
-                        onClick = actionSendBroadcast(
-                            Intent(MediaControlReceiver.ACTION_PREVIOUS)
-                                .setClass(context, MediaControlReceiver::class.java)
-                        )
+                        colorFilter = ColorFilter.tint(ColorProvider(textColor))
                     )
-                    CircleIconButton(
-                        imageProvider = ImageProvider(
+                    Spacer(modifier = GlanceModifier.size(24.dp))
+                    Image(
+                        modifier = GlanceModifier.size(26.dp)
+                            .clickable(actionSendBroadcast(
+                                Intent(MediaControlReceiver.ACTION_PLAY_PAUSE)
+                                    .setClass(context, MediaControlReceiver::class.java)
+                            )),
+                        provider = ImageProvider(
                             if (isPlaying) android.R.drawable.ic_media_pause
                             else android.R.drawable.ic_media_play
                         ),
                         contentDescription = if (isPlaying) "Pause" else "Play",
-                        backgroundColor = null,
-                        contentColor = ColorProvider(textColor),
-                        onClick = actionSendBroadcast(
-                            Intent(MediaControlReceiver.ACTION_PLAY_PAUSE)
-                                .setClass(context, MediaControlReceiver::class.java)
-                        )
+                        colorFilter = ColorFilter.tint(ColorProvider(textColor))
                     )
-                    CircleIconButton(
-                        imageProvider = ImageProvider(android.R.drawable.ic_media_next),
+                    Spacer(modifier = GlanceModifier.size(24.dp))
+                    Image(
+                        modifier = GlanceModifier.size(26.dp)
+                            .clickable(actionSendBroadcast(
+                                Intent(MediaControlReceiver.ACTION_NEXT)
+                                    .setClass(context, MediaControlReceiver::class.java)
+                            )),
+                        provider = ImageProvider(android.R.drawable.ic_media_next),
                         contentDescription = "Next track",
-                        backgroundColor = null,
-                        contentColor = ColorProvider(textColor),
-                        onClick = actionSendBroadcast(
-                            Intent(MediaControlReceiver.ACTION_NEXT)
-                                .setClass(context, MediaControlReceiver::class.java)
-                        )
+                        colorFilter = ColorFilter.tint(ColorProvider(textColor))
                     )
                 }
             }
