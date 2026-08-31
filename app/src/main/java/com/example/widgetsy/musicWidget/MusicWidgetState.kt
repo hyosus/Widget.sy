@@ -5,7 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 
 sealed interface MusicWidgetState {
 
-    /** A refresh is in-flight; data is not yet ready to display. */
+    /** No media info has ever been written yet (e.g. right after install). */
     data object Loading : MusicWidgetState
 
     /** We have data, but nothing is currently tracked/playing. */
@@ -18,9 +18,7 @@ sealed interface MusicWidgetState {
         val albumArt: Bitmap?,
         val blurredArt: Bitmap?,
         val dynamicBgColor: Int?,
-        val dynamicTextColor: Int?,
-        /** A refresh (e.g. track skip) is in-flight; keep showing this data but as a skeleton. */
-        val isRefreshing: Boolean = false
+        val dynamicTextColor: Int?
     ) : MusicWidgetState
 }
 
@@ -31,8 +29,6 @@ sealed interface MusicWidgetState {
 fun Preferences.toMusicWidgetState(
     decodeBitmap: (String) -> Bitmap?
 ): MusicWidgetState {
-    val isLoading = this[MusicWidgetKeys.IS_LOADING] == true
-
     val title = this[MusicWidgetKeys.TITLE]
     val artist = this[MusicWidgetKeys.ARTIST]
     val isPlaying = this[MusicWidgetKeys.IS_PLAYING]
@@ -40,14 +36,15 @@ fun Preferences.toMusicWidgetState(
     val blurredArtPath = this[MusicWidgetKeys.BLURRED_ART_PATH]
     val dynamicBgColor = this[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR]
     val dynamicTextColor = this[MusicWidgetKeys.DYNAMIC_TEXT_COLOR]
+    val isLoading = this[MusicWidgetKeys.IS_LOADING]
 
-    // Nothing has ever been shown yet — fall back to the generic loading/empty UI.
+    if (isLoading == true) return MusicWidgetState.Loading
+
+    // We have state, but it represents "nothing playing".
     if (title.isNullOrEmpty()) {
-        return if (isLoading) MusicWidgetState.Loading else MusicWidgetState.NoTrack
+        return MusicWidgetState.NoTrack
     }
 
-    // Keep showing the last known track/colors while a refresh is in-flight, so a
-    // skip doesn't flash the widget back to a blank default background.
     return MusicWidgetState.Completed(
         title = title,
         artist = artist.takeUnless { it.isNullOrEmpty() } ?: "Unknown artist",
@@ -55,7 +52,6 @@ fun Preferences.toMusicWidgetState(
         albumArt = albumArtPath?.let(decodeBitmap),
         blurredArt = blurredArtPath?.let(decodeBitmap),
         dynamicBgColor = dynamicBgColor,
-        dynamicTextColor = dynamicTextColor,
-        isRefreshing = isLoading
+        dynamicTextColor
     )
 }
