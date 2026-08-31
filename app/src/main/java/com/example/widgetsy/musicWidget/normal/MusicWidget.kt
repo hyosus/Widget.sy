@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
@@ -81,6 +82,18 @@ class MusicWidget: GlanceAppWidget() {
             }
         }
     }
+
+    override suspend fun providePreview(context: Context, widgetCategory: Int) {
+        provideContent {
+            WidgetLayout("Song Title", "Artist", false, null, Color.Black, null)
+        }
+    }
+
+    override val previewSizeMode = SizeMode.Responsive(
+        setOf(
+            DpSize(250.dp, 110.dp),
+        )
+    )
 }
 
 @SuppressLint("RestrictedApi")
@@ -132,9 +145,9 @@ private fun LoadingSkeletonLayout(bgColor: Int?) {
 
                 Row(modifier = GlanceModifier.fillMaxWidth()) {
                     Box(modifier = GlanceModifier.size(26.dp).cornerRadius(13.dp).background(skeletonColor)) {}
-                    Spacer(modifier = GlanceModifier.size(24.dp))
+                    Spacer(modifier = GlanceModifier.width(34.dp))
                     Box(modifier = GlanceModifier.size(26.dp).cornerRadius(13.dp).background(skeletonColor)) {}
-                    Spacer(modifier = GlanceModifier.size(24.dp))
+                    Spacer(modifier = GlanceModifier.width(34.dp))
                     Box(modifier = GlanceModifier.size(26.dp).cornerRadius(13.dp).background(skeletonColor)) {}
                 }
             }
@@ -158,7 +171,7 @@ private fun WidgetLayout(
 
     Scaffold(
         modifier = GlanceModifier.fillMaxSize()
-            .padding(vertical = 12.dp),
+            .padding(vertical = 12.dp, horizontal = 2.dp),
         backgroundColor = if (bgColor != null) {
             ColorProvider(Color(bgColor))
         } else {
@@ -172,7 +185,7 @@ private fun WidgetLayout(
                 provider = if (albumArtBitmap != null) {
                     ImageProvider(albumArtBitmap)
                 } else {
-                    ImageProvider(R.drawable.vinyl)
+                    ImageProvider(R.drawable.default_cover)
                 },
                 contentDescription = "Album cover"
             )
@@ -184,7 +197,7 @@ private fun WidgetLayout(
                 verticalAlignment = Alignment.Bottom
             ) {
                 Column(
-                    modifier = GlanceModifier.fillMaxWidth(),
+                    modifier = GlanceModifier.fillMaxWidth().padding(start = 4.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     Text(
@@ -218,11 +231,11 @@ private fun WidgetLayout(
                                 Intent(MediaControlReceiver.ACTION_PREVIOUS)
                                     .setClass(context, MediaControlReceiver::class.java)
                             )),
-                        provider = ImageProvider(android.R.drawable.ic_media_previous),
+                        provider = ImageProvider(R.drawable.skip_previous),
                         contentDescription = "Previous track",
                         colorFilter = ColorFilter.tint(ColorProvider(textColor))
                     )
-                    Spacer(modifier = GlanceModifier.size(24.dp))
+                    Spacer(modifier = GlanceModifier.width(34.dp))
                     Image(
                         modifier = GlanceModifier.size(26.dp)
                             .clickable(actionSendBroadcast(
@@ -230,20 +243,20 @@ private fun WidgetLayout(
                                     .setClass(context, MediaControlReceiver::class.java)
                             )),
                         provider = ImageProvider(
-                            if (isPlaying) android.R.drawable.ic_media_pause
-                            else android.R.drawable.ic_media_play
+                            if (isPlaying) R.drawable.pause
+                            else R.drawable.play_arrow
                         ),
                         contentDescription = if (isPlaying) "Pause" else "Play",
                         colorFilter = ColorFilter.tint(ColorProvider(textColor))
                     )
-                    Spacer(modifier = GlanceModifier.size(24.dp))
+                    Spacer(modifier = GlanceModifier.width(34.dp))
                     Image(
                         modifier = GlanceModifier.size(26.dp)
                             .clickable(actionSendBroadcast(
                                 Intent(MediaControlReceiver.ACTION_NEXT)
                                     .setClass(context, MediaControlReceiver::class.java)
                             )),
-                        provider = ImageProvider(android.R.drawable.ic_media_next),
+                        provider = ImageProvider(R.drawable.skip_next),
                         contentDescription = "Next track",
                         colorFilter = ColorFilter.tint(ColorProvider(textColor))
                     )

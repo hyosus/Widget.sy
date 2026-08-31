@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -71,13 +69,15 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     implementation("org.jsoup:jsoup:1.21.2")
     implementation("androidx.lifecycle:lifecycle-process:2.9.4")
+
     // For Glance support
-    implementation("androidx.glance:glance:1.1.1")
+    implementation("androidx.glance:glance:1.2.0")
     implementation("androidx.glance:glance-material3:1.1.1")
+    implementation("androidx.glance:glance-preview:1.2.0")
 
     // For AppWidgets support
-    implementation("androidx.glance:glance-appwidget:1.1.1")
-
+    implementation("androidx.glance:glance-appwidget:1.2.0")
+    implementation("androidx.glance:glance-appwidget-preview:1.2.0")
     implementation("com.google.code.gson:gson:2.6.1")
 
     // For music widget
