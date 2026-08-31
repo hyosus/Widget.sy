@@ -1,34 +1,57 @@
 package com.example.widgetsy.musicWidget
 
-
-import android.content.Context
-import androidx.datastore.core.DataStore
+import android.graphics.Bitmap
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.Flow
 
-// Define preference keys
-object PreferenceKeys {
-    val TRACK_NAME = stringPreferencesKey("track_name")
-    val ARTIST_NAME = stringPreferencesKey("artist_name")
-    val ALBUM_ART_URI = stringPreferencesKey("album_art_uri")
+sealed interface MusicWidgetState {
+
+    /** No media info has ever been written yet (e.g. right after install). */
+    data object Loading : MusicWidgetState
+
+    /** We have data, but nothing is currently tracked/playing. */
+    data object NoTrack : MusicWidgetState
+
+    data class Completed(
+        val title: String,
+        val artist: String,
+        val isPlaying: Boolean,
+        val albumArt: Bitmap?,
+        val blurredArt: Bitmap?,
+        val dynamicBgColor: Int?,
+        val dynamicTextColor: Int?
+    ) : MusicWidgetState
 }
 
-class MusicRepository(context: Context) {
-    // create datastore instance
-    private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "spotify_track")
-    private val dataStore = context.dataStore
+/**
+ * Maps the persisted Glance Preferences into a typed widget state.
+ * Keeps the composable free of raw preference reads / ad-hoc null fallbacks.
+ */
+fun Preferences.toMusicWidgetState(
+    decodeBitmap: (String) -> Bitmap?
+): MusicWidgetState {
+    val title = this[MusicWidgetKeys.TITLE]
+    val artist = this[MusicWidgetKeys.ARTIST]
+    val isPlaying = this[MusicWidgetKeys.IS_PLAYING]
+    val albumArtPath = this[MusicWidgetKeys.ALBUM_ART_PATH]
+    val blurredArtPath = this[MusicWidgetKeys.BLURRED_ART_PATH]
+    val dynamicBgColor = this[MusicWidgetKeys.DYNAMIC_BACKGROUND_COLOR]
+    val dynamicTextColor = this[MusicWidgetKeys.DYNAMIC_TEXT_COLOR]
+    val isLoading = this[MusicWidgetKeys.IS_LOADING]
 
-    companion object {
-        val trackNameKey = stringPreferencesKey("TRACK_NAME_KEY")
+    if (isLoading == true) return MusicWidgetState.Loading
+
+    // We have state, but it represents "nothing playing".
+    if (title.isNullOrEmpty()) {
+        return MusicWidgetState.NoTrack
     }
 
-    suspend fun setTrackName(trackName: String) {
-        dataStore.edit { pref ->
-            pref[trackNameKey] = trackName
-        }
-    }
-
+    return MusicWidgetState.Completed(
+        title = title,
+        artist = artist.takeUnless { it.isNullOrEmpty() } ?: "Unknown artist",
+        isPlaying = isPlaying ?: false,
+        albumArt = albumArtPath?.let(decodeBitmap),
+        blurredArt = blurredArtPath?.let(decodeBitmap),
+        dynamicBgColor = dynamicBgColor,
+        dynamicTextColor
+    )
 }

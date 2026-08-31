@@ -43,9 +43,11 @@
         android:id="@+id/illuminationTxt"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_above="@+id/moonriseTxt"
         android:layout_below="@+id/moonPhaseTxt"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="4dp"
+        android:layout_marginBottom="12dp"
         android:text="96.6%"
         android:textColor="#FFFFFF" />
 
