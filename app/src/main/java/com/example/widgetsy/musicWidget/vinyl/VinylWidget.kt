@@ -86,6 +86,25 @@ class VinylWidget : GlanceAppWidget() {
             }
         }
     }
+
+    override suspend fun providePreview(context: Context, widgetCategory: Int) {
+        provideContent {
+            val size = LocalSize.current  // will be each DpSize from previewSizeMode in turn
+            val isTallLayout = size.height >= size.width
+            if (isTallLayout) {
+                TallVinylLayout("Song Title", "Artist", null, null)
+            } else {
+                WideVinylLayout("Song Title", "Artist", false, null)
+            }
+        }
+    }
+
+    override val previewSizeMode = SizeMode.Responsive(
+        setOf(
+            DpSize(250.dp, 80.dp),   // wide → WideVinylLayout
+            DpSize(120.dp, 200.dp),  // tall → TallVinylLayout
+        )
+    )
 }
 
 // ── Dimension helpers ────────────────────────────────────────────────

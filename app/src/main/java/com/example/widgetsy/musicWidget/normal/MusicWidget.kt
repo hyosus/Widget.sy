@@ -91,7 +91,7 @@ class MusicWidget: GlanceAppWidget() {
 
     override val previewSizeMode = SizeMode.Responsive(
         setOf(
-            DpSize(250.dp, 110.dp),
+            DpSize(250.dp, 80.dp),
         )
     )
 }

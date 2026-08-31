@@ -1,5 +1,8 @@
 package com.example.widgetsy
 
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo
+import android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -24,8 +27,10 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import com.example.widgetsy.musicWidget.MediaListenerService
 import com.example.widgetsy.musicWidget.normal.MusicWidgetReceiver
+import com.example.widgetsy.musicWidget.vinyl.VinylWidgetReceiver
 import com.example.widgetsy.ui.theme.WeatherAppTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,9 +44,35 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        CoroutineScope(Dispatchers.IO).launch {
-            GlanceAppWidgetManager(applicationContext)
-                .setWidgetPreviews(MusicWidgetReceiver::class)  // your receiver class
+        val receiverClasses = listOf(
+            MusicWidgetReceiver::class.java,
+            VinylWidgetReceiver::class.java,
+        )
+
+        val glanceAppWidgetManager = GlanceAppWidgetManager(applicationContext)
+
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                for (receiver in receiverClasses) {
+                    // skip if preview already set — avoids burning the rate limit
+                    val component = ComponentName(applicationContext, receiver)
+                    val providerInfo = (getSystemService(Context.APPWIDGET_SERVICE) as AppWidgetManager)
+                        .installedProviders
+                        .firstOrNull { it.provider == component }
+
+                    if (providerInfo?.generatedPreviewCategories?.and(WIDGET_CATEGORY_HOME_SCREEN) != 0) {
+                        Log.i("Widget", "Skipped $receiver, preview already set")
+                        continue
+                    }
+
+                    val result = glanceAppWidgetManager.setWidgetPreviews(receiver.kotlin)
+                    if (result == GlanceAppWidgetManager.SET_WIDGET_PREVIEWS_RESULT_RATE_LIMITED) {
+                        Log.e("Widget", "Rate limited for $receiver")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("Widget", "Error setting widget previews", e)
+            }
         }
 
         setContent {
